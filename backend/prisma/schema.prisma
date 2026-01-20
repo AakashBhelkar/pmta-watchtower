@@ -1,0 +1,192 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum FileType {
+  acct
+  tran
+  bounce
+  fbl
+  rb
+  unknown
+}
+
+enum ProcessingStatus {
+  pending
+  processing
+  completed
+  error
+}
+
+enum Severity {
+  low
+  medium
+  high
+  critical
+}
+
+enum AlertStatus {
+  open
+  acknowledged
+  resolved
+}
+
+enum IncidentStatus {
+  open
+  resolved
+}
+
+enum EntityType {
+  domain
+  vmta
+  user
+  job
+  ip
+}
+
+model File {
+  id                String           @id @default(uuid())
+  fileName          String
+  fileType          FileType
+  fileHash          String?          @unique
+  fileSize          BigInt?
+  uploadTime        DateTime         @default(now())
+  processingStatus  ProcessingStatus @default(pending)
+  rowCount          Int?
+  errorLogs         Json?            @default("[]")
+  metadata          Json?            @default("{}")
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+  events            Event[]
+
+  @@index([fileType])
+  @@index([fileHash])
+  @@index([uploadTime])
+}
+
+model Event {
+  id                String    @id @default(uuid())
+  eventType         FileType
+  eventTimestamp    DateTime?
+  fileId            String?
+  file              File?     @relation(fields: [fileId], references: [id], onDelete: Cascade)
+  
+  // Core fields
+  jobId             String?
+  sender            String?
+  recipient         String?
+  recipientDomain   String?
+  vmta              String?
+  vmtaPool          String?
+  sourceIp          String?
+  destinationIp     String?
+  envId             String?
+  messageId         String?
+  customHeader      String?
+  
+  // Status fields
+  smtpStatus        String?
+  bounceCategory    String?
+  dsnAction         String?
+  dsnDiag           String?
+  
+  // Derived fields
+  deliveryLatency   Decimal?  @db.Decimal(10, 3)
+  
+  // Raw data
+  rawData           Json?
+  
+  createdAt         DateTime  @default(now())
+
+  @@index([eventType])
+  @@index([eventTimestamp])
+  @@index([jobId])
+  @@index([sender])
+  @@index([recipientDomain])
+  @@index([vmta])
+  @@index([fileId])
+  @@index([messageId])
+}
+
+model AggregateMinute {
+  id                String    @id @default(uuid())
+  timeBucket        DateTime
+  eventType         FileType
+  jobId             String?
+  sender            String?
+  recipientDomain   String?
+  vmta              String?
+  totalCount        Int       @default(0)
+  delivered         Int       @default(0)
+  bounced           Int       @default(0)
+  deferred          Int       @default(0)
+  complaints        Int       @default(0)
+  avgLatencyMs      Float?
+  p95LatencyMs      Float?
+
+  @@unique([timeBucket, eventType, jobId, sender, recipientDomain, vmta])
+  @@index([timeBucket])
+  @@index([recipientDomain, timeBucket])
+  @@index([jobId, timeBucket])
+  @@index([eventType])
+}
+
+model RiskScore {
+  id                String    @id @default(uuid())
+  entityType        EntityType
+  entityValue       String
+  riskScore         Int       @default(0)
+  riskLevel         String    @default("low")
+  contributingFactors Json?   @default("{}")
+  calculatedAt      DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@unique([entityType, entityValue])
+  @@index([riskScore])
+}
+
+model Alert {
+  id                String      @id @default(uuid())
+  alertType         String
+  severity          Severity
+  entityType        EntityType
+  entityValue       String
+  timeWindowStart   DateTime
+  timeWindowEnd     DateTime
+  summary           String
+  probableCause     String?
+  metrics           Json?       @default("{}")
+  status            AlertStatus @default(open)
+  incidentId        String?
+  incident          Incident?   @relation(fields: [incidentId], references: [id])
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+
+  @@index([entityType, entityValue])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model Incident {
+  id                String         @id @default(uuid())
+  title             String
+  severity          Severity
+  entityType        EntityType
+  entityValue       String
+  startTime         DateTime
+  endTime           DateTime?
+  status            IncidentStatus @default(open)
+  summary           String
+  rootCause         String?
+  alerts            Alert[]
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+
+  @@index([entityType, entityValue])
+  @@index([status])
+}

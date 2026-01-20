@@ -1,0 +1,1 @@
+export { SendersView } from './view';

@@ -1,0 +1,6 @@
+type,timeLogged,bounceCat,vmta,orig,rcpt,srcMta,dsnStatus,dsnMta,dsnDiag,jobId,envId
+b,2024-01-20T10:30:03Z,hard,vmta-3,sender@example.com,invalid@bounce.test,mta-1,550,mail.bounce.test,smtp; 550 5.1.1 User unknown,JOB-1001,ENV-004
+b,2024-01-20T10:31:00Z,soft,vmta-1,sender@example.com,temp-fail@test.com,mta-1,451,mail.test.com,smtp; 451 4.7.1 Please try again later,JOB-1001,ENV-011
+b,2024-01-20T10:32:00Z,hard,vmta-2,promo@deals.com,bad-address@yahoo.com,mta-2,550,mta5.am0.yahoodns.net,smtp; 550 5.1.1 Mailbox does not exist,JOB-1003,ENV-012
+b,2024-01-20T10:33:00Z,block,vmta-4,bulk@massmail.net,blocked@gmail.com,mta-3,550,mx.google.com,smtp; 550 5.7.1 Our system has detected an unusual rate of unsolicited mail,JOB-1005,ENV-013
+b,2024-01-20T10:34:00Z,soft,vmta-1,news@updates.co,over-quota@aol.com,mta-1,452,mailin-01.mx.aol.com,smtp; 452 4.2.2 Mailbox full,JOB-1004,ENV-014

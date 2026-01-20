@@ -1,0 +1,1 @@
+export { DomainsView } from './view';

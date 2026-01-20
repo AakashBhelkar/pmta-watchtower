@@ -1,0 +1,35 @@
+{
+  "name": "backend",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "nodemon index.js",
+    "prisma:generate": "prisma generate",
+    "prisma:migrate": "prisma migrate dev",
+    "seed": "node seed-data.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "@prisma/client": "5.22.0",
+    "adm-zip": "^0.5.16",
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.3",
+    "express": "^5.2.1",
+    "helmet": "^8.1.0",
+    "json2csv": "^6.0.0-alpha.2",
+    "luxon": "^3.7.2",
+    "morgan": "^1.10.1",
+    "multer": "^2.0.2",
+    "papaparse": "^5.5.3",
+    "pg": "^8.17.1"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.11",
+    "prisma": "5.22.0"
+  }
+}

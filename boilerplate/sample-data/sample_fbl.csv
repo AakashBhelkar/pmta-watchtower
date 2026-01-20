@@ -1,0 +1,4 @@
+type,timeLogged,orig,rcpt,srcMta,dlvSourceIp,reportingMta,vmta,vmtaPool,jobId,envId,queue
+fbl,2024-01-20T11:00:00Z,promo@deals.com,complainer1@gmail.com,mta-2,192.168.1.12,abuse.google.com,vmta-4,pool-promo,JOB-1003,ENV-015,queue-2
+fbl,2024-01-20T11:15:00Z,bulk@massmail.net,unhappy@yahoo.com,mta-3,192.168.1.13,fbl.yahoo.com,vmta-5,pool-bulk,JOB-1005,ENV-016,queue-3
+fbl,2024-01-20T11:30:00Z,promo@deals.com,marked-spam@outlook.com,mta-2,192.168.1.12,fbl.outlook.com,vmta-4,pool-promo,JOB-1003,ENV-017,queue-2

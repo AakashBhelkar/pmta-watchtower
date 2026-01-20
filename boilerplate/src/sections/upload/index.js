@@ -1,0 +1,1 @@
+export { UploadView } from './view';
