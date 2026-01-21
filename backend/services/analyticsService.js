@@ -13,7 +13,7 @@ exports.aggregateFileData = async (fileId) => {
         // It handles: totalCount, delivered (tran), bounced (bounce/rb), deferred (acct with deferred status), complaints (fbl)
         // Latency avg/p95 (only for tran)
 
-        await prisma.$executeRaw`
+        await prisma.$executeRawUnsafe(`
             INSERT INTO "AggregateMinute" (
                 "id",
                 "timeBucket",
@@ -39,14 +39,14 @@ exports.aggregateFileData = async (fileId) => {
                 "recipientDomain",
                 "vmta",
                 COUNT(*) as "totalCount",
-                COUNT(*) FILTER (WHERE "eventType" = 'tran') as "delivered",
-                COUNT(*) FILTER (WHERE "eventType" IN ('bounce', 'rb')) as "bounced",
-                COUNT(*) FILTER (WHERE "eventType" = 'acct' AND "dsnAction" = 'delayed') as "deferred",
-                COUNT(*) FILTER (WHERE "eventType" = 'fbl') as "complaints",
-                AVG(CAST("deliveryLatency" AS FLOAT)) * 1000 FILTER (WHERE "eventType" = 'tran') as "avgLatencyMs",
-                PERCENTILE_CONT(0.95) WITHIN GROUP (ORDER BY CAST("deliveryLatency" AS FLOAT) * 1000) FILTER (WHERE "eventType" = 'tran') as "p95LatencyMs"
+                SUM(CASE WHEN "eventType" = 'tran' THEN 1 ELSE 0 END) as "delivered",
+                SUM(CASE WHEN "eventType" IN ('bounce', 'rb') THEN 1 ELSE 0 END) as "bounced",
+                SUM(CASE WHEN "eventType" = 'acct' AND "dsnAction" = 'delayed' THEN 1 ELSE 0 END) as "deferred",
+                SUM(CASE WHEN "eventType" = 'fbl' THEN 1 ELSE 0 END) as "complaints",
+                AVG(CASE WHEN "eventType" = 'tran' THEN CAST("deliveryLatency" AS FLOAT) * 1000 ELSE NULL END) as "avgLatencyMs",
+                PERCENTILE_CONT(0.95) WITHIN GROUP (ORDER BY CAST("deliveryLatency" AS FLOAT) * 1000) as "p95LatencyMs"
             FROM "Event"
-            WHERE "fileId" = ${fileId}
+            WHERE "fileId" = '${fileId}'
               AND "eventTimestamp" IS NOT NULL
             GROUP BY 2, 3, 4, 5, 6, 7
             ON CONFLICT ("timeBucket", "eventType", "jobId", "sender", "recipientDomain", "vmta") 
@@ -56,9 +56,9 @@ exports.aggregateFileData = async (fileId) => {
                 "bounced" = "AggregateMinute"."bounced" + EXCLUDED."bounced",
                 "deferred" = "AggregateMinute"."deferred" + EXCLUDED."deferred",
                 "complaints" = "AggregateMinute"."complaints" + EXCLUDED."complaints",
-                "avgLatencyMs" = ("AggregateMinute"."avgLatencyMs" + EXCLUDED."avgLatencyMs") / 2, -- Simple average for now
-                "p95LatencyMs" = GREATEST("AggregateMinute"."p95LatencyMs", EXCLUDED."p95LatencyMs");
-        `;
+                "avgLatencyMs" = (COALESCE("AggregateMinute"."avgLatencyMs", 0) + COALESCE(EXCLUDED."avgLatencyMs", 0)) / 2,
+                "p95LatencyMs" = GREATEST(COALESCE("AggregateMinute"."p95LatencyMs", 0), COALESCE(EXCLUDED."p95LatencyMs", 0));
+        `);
 
         console.log(`✅ Aggregation completed for file: ${fileId}`);
 

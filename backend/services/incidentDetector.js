@@ -3,12 +3,13 @@ const prisma = new PrismaClient();
 
 /**
  * Runs incident detection rules against recent data
+ * @param {Date} referenceDate Optional date to use as 'now'
  */
-exports.detectIncidents = async () => {
+exports.detectIncidents = async (referenceDate = new Date()) => {
     try {
-        console.log('🔍 Running Incident Detection Rules...');
+        console.log(`🔍 Running Incident Detection Rules (Reference: ${referenceDate.toISOString()})...`);
 
-        const now = new Date();
+        const now = referenceDate;
         const shortWindow = new Date(now.getTime() - 15 * 60 * 1000); // 15 mins
         const longWindow = new Date(now.getTime() - 24 * 60 * 60 * 1000); // 24 hours
 
@@ -17,6 +18,9 @@ exports.detectIncidents = async () => {
 
         // Rule 2: Complaint Spikes
         await this.detectComplaintSpikes(new Date(now.getTime() - 30 * 60 * 1000), new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000));
+
+        // Rule 3: High Bounce Rate
+        await this.detectHighBounceRate(shortWindow);
 
         console.log('✅ Incident Detection Complete.');
     } catch (error) {
@@ -51,13 +55,13 @@ exports.detectDomainThrottling = async (shortWindow, longWindow) => {
 
         const baselineAvg = baseline._avg.avgLatencyMs || 500; // fallback 500ms
 
-        if (domain._avg.avgLatencyMs > baselineAvg * 2 && domain._sum.deferred > 5) {
+        if (domain._avg.avgLatencyMs > baselineAvg * 1.5 && (domain._sum.deferred > 0 || domain._avg.avgLatencyMs > 5000)) {
             await this.createAlert({
                 alertType: 'THROTTLING',
                 severity: 'high',
                 entityType: 'domain',
                 entityValue: domain.recipientDomain,
-                summary: `Gmail throttling detected: Latency is ${(domain._avg.avgLatencyMs / 1000).toFixed(1)}s (vs baseline ${(baselineAvg / 1000).toFixed(1)}s)`,
+                summary: `ISP Throttling detected on ${domain.recipientDomain}: Latency is ${(domain._avg.avgLatencyMs / 1000).toFixed(1)}s`,
                 metrics: { currentLatency: domain._avg.avgLatencyMs, baselineLatency: baselineAvg, deferred: domain._sum.deferred }
             });
         }
@@ -75,17 +79,17 @@ exports.detectComplaintSpikes = async (shortWindow, longWindow) => {
     });
 
     for (const job of currentComplaints) {
-        if (!job._sum.complaints || job._sum.complaints < 5) continue;
+        if (!job._sum.complaints || job._sum.complaints < 1) continue;
 
         const rate = job._sum.complaints / job._sum.totalCount;
 
-        if (rate > 0.05) { // 5% complaint rate is massive
+        if (rate > 0.01) { // 1% complaint rate
             await this.createAlert({
                 alertType: 'COMPLAINT_SPIKE',
                 severity: 'critical',
                 entityType: 'job',
                 entityValue: job.jobId || 'unknown',
-                summary: `Unusual complaint spike for Job ${job.jobId}: Rate is ${(rate * 100).toFixed(2)}%`,
+                summary: `Complaint spike for Job ${job.jobId}: Rate is ${(rate * 100).toFixed(2)}%`,
                 metrics: { complaintRate: rate, totalComplaints: job._sum.complaints }
             });
         }
@@ -93,7 +97,35 @@ exports.detectComplaintSpikes = async (shortWindow, longWindow) => {
 };
 
 /**
- * Logic to save alert and prevent duplicates
+ * Detects high bounce rates
+ */
+exports.detectHighBounceRate = async (shortWindow) => {
+    const stats = await prisma.aggregateMinute.groupBy({
+        by: ['jobId'],
+        _sum: { bounced: true, totalCount: true },
+        where: { timeBucket: { gte: shortWindow } }
+    });
+
+    for (const job of stats) {
+        if (!job._sum.bounced || job._sum.totalCount < 10) continue;
+
+        const rate = job._sum.bounced / job._sum.totalCount;
+
+        if (rate > 0.2) { // 20% bounce rate
+            await this.createAlert({
+                alertType: 'HIGH_BOUNCE',
+                severity: 'high',
+                entityType: 'job',
+                entityValue: job.jobId || 'unknown',
+                summary: `High bounce rate for Job ${job.jobId}: ${(rate * 100).toFixed(1)}%`,
+                metrics: { bounceRate: rate, totalBounced: job._sum.bounced }
+            });
+        }
+    }
+};
+
+/**
+ * Logic to save alert and prevent duplicates, and manage incidents
  */
 exports.createAlert = async (data) => {
     const existing = await prisma.alert.findFirst({
@@ -107,9 +139,33 @@ exports.createAlert = async (data) => {
 
     if (existing) return;
 
+    // Find or Create Incident
+    let incident = await prisma.incident.findFirst({
+        where: {
+            entityType: data.entityType,
+            entityValue: data.entityValue,
+            status: 'open'
+        }
+    });
+
+    if (!incident) {
+        incident = await prisma.incident.create({
+            data: {
+                title: `${data.alertType.replace('_', ' ')}: ${data.entityValue}`,
+                severity: data.severity,
+                entityType: data.entityType,
+                entityValue: data.entityValue,
+                startTime: new Date(),
+                summary: data.summary,
+                status: 'open'
+            }
+        });
+    }
+
     await prisma.alert.create({
         data: {
             ...data,
+            incidentId: incident.id,
             timeWindowStart: new Date(Date.now() - 15 * 60 * 1000),
             timeWindowEnd: new Date()
         }

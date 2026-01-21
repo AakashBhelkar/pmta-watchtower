@@ -85,6 +85,12 @@ router.get('/stats', validate(schemas.analyticsQuery), async (req, res) => {
                 deferred: true,
                 complaints: true
             },
+            _avg: {
+                avgLatencyMs: true,
+            },
+            _max: {
+                p95LatencyMs: true
+            },
             where
         });
 
@@ -99,7 +105,9 @@ router.get('/stats', validate(schemas.analyticsQuery), async (req, res) => {
             bounced: aggregation._sum.bounced || 0,
             deferred: aggregation._sum.deferred || 0,
             complaints: aggregation._sum.complaints || 0,
-            rbEvents: rbCounts._sum.totalCount || 0
+            rbEvents: rbCounts._sum.totalCount || 0,
+            avgLatency: aggregation._avg.avgLatencyMs ? (aggregation._avg.avgLatencyMs / 1000).toFixed(2) : 0,
+            p95Latency: aggregation._max.p95LatencyMs ? (aggregation._max.p95LatencyMs / 1000).toFixed(2) : 0,
         };
 
         res.json(stats);
@@ -115,10 +123,10 @@ router.get('/volume', validate(schemas.analyticsQuery), async (req, res) => {
         const volumeTrend = await prisma.$queryRaw`
             SELECT 
                 DATE_TRUNC('hour', "timeBucket") as "time",
-                SUM("totalCount") as "sent",
-                SUM("delivered") as "delivered",
-                SUM("bounced") as "bounced",
-                SUM("deferred") as "deferred"
+                CAST(SUM("totalCount") AS FLOAT) as "sent",
+                CAST(SUM("delivered") AS FLOAT) as "delivered",
+                CAST(SUM("bounced") AS FLOAT) as "bounced",
+                CAST(SUM("deferred") AS FLOAT) as "deferred"
             FROM "AggregateMinute"
             WHERE "timeBucket" >= ${from ? new Date(from) : new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)}
               AND "timeBucket" <= ${to ? new Date(to) : new Date()}
@@ -127,6 +135,7 @@ router.get('/volume', validate(schemas.analyticsQuery), async (req, res) => {
         `;
         res.json(volumeTrend);
     } catch (error) {
+        console.error('Volume Trend Error:', error);
         res.status(500).json({ error: 'Failed to fetch volume data' });
     }
 });
@@ -138,9 +147,9 @@ router.get('/latency', validate(schemas.analyticsQuery), async (req, res) => {
         const latencyTrend = await prisma.$queryRaw`
             SELECT 
                 DATE_TRUNC('hour', "timeBucket") as "time",
-                AVG("avgLatencyMs") / 1000 as "avgLatency",
-                MAX("p95LatencyMs") / 1000 as "p95Latency",
-                SUM("totalCount") as "count"
+                CAST(AVG("avgLatencyMs") / 1000 AS FLOAT) as "avgLatency",
+                CAST(MAX("p95LatencyMs") / 1000 AS FLOAT) as "p95Latency",
+                CAST(SUM("totalCount") AS FLOAT) as "count"
             FROM "AggregateMinute"
             WHERE "eventType" = 'tran'
               AND "timeBucket" >= ${from ? new Date(from) : new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)}
@@ -150,6 +159,7 @@ router.get('/latency', validate(schemas.analyticsQuery), async (req, res) => {
         `;
         res.json(latencyTrend);
     } catch (error) {
+        console.error('Latency Trend Error:', error);
         res.status(500).json({ error: 'Failed to fetch latency data' });
     }
 });
@@ -205,6 +215,7 @@ router.get('/senders', validate(schemas.analyticsQuery), async (req, res) => {
         const senderStats = await prisma.aggregateMinute.groupBy({
             by: ['sender'],
             _sum: { totalCount: true, delivered: true, bounced: true, complaints: true },
+            _count: { jobId: true },
             where,
             orderBy: { _sum: { totalCount: 'desc' } },
             take: 100
@@ -227,6 +238,7 @@ router.get('/senders', validate(schemas.analyticsQuery), async (req, res) => {
                 delivered: s._sum.delivered,
                 bounced: s._sum.bounced,
                 complaints: s._sum.complaints,
+                jobCount: s._count.jobId,
                 riskScore: risk.riskScore,
                 riskLevel: risk.riskLevel
             };

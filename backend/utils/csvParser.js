@@ -10,18 +10,23 @@ const FILE_TYPE_HEADERS = {
 exports.detectFileType = (headers) => {
     if (!headers || !Array.isArray(headers)) return 'unknown';
 
-    const normalizedHeaders = headers.map(h => h.trim());
+    const normalizedHeaders = headers.map(h => h.trim().toLowerCase());
+    let bestMatch = 'unknown';
+    let highestRatio = 0;
 
     for (const [fileType, expectedHeaders] of Object.entries(FILE_TYPE_HEADERS)) {
         const matchCount = expectedHeaders.filter(h =>
-            normalizedHeaders.some(nh => nh.toLowerCase() === h.toLowerCase())
+            normalizedHeaders.includes(h.toLowerCase())
         ).length;
 
-        if (matchCount / expectedHeaders.length >= 0.6) {
-            return fileType;
+        const ratio = matchCount / expectedHeaders.length;
+
+        if (ratio >= 0.6 && ratio > highestRatio) {
+            highestRatio = ratio;
+            bestMatch = fileType;
         }
     }
-    return 'unknown';
+    return bestMatch;
 };
 
 exports.normalizeEvent = (row, fileType, fileId) => {
@@ -47,8 +52,21 @@ exports.normalizeEvent = (row, fileType, fileId) => {
         return (l - q) / 1000; // in seconds
     };
 
+    // Determine specific event type for 'acct' logs based on 'type' field
+    let mappedType = fileType;
+    if (fileType === 'acct' && row.type) {
+        switch (row.type.toLowerCase()) {
+            case 'd': mappedType = 'tran'; break; // Delivered
+            case 'b': mappedType = 'bounce'; break; // Bounce
+            case 't': mappedType = 'acct'; break; // Transient/Deferred (keep as acct)
+            case 'f': mappedType = 'fbl'; break; // Feedback Loop
+            case 'r': mappedType = 'rb'; break; // Remote Bounce
+            // Other types like 'p' (queued) can stay as 'acct' or be excluded
+        }
+    }
+
     return {
-        eventType: fileType,
+        eventType: mappedType,
         eventTimestamp: parseTimestamp(row.timeLogged),
         fileId: fileId,
         jobId: row.jobId || null,
