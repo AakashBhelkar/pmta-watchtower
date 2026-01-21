@@ -66,6 +66,7 @@ export function SendersView() {
                     sender: s.sender,
                     total: s.total || 0,
                     delivered: s.delivered || 0,
+                    jobCount: s.jobCount || 0,
                     bounceRate: bounceRate.toFixed(2),
                     complaintRate: complaintRate.toFixed(2),
                     riskScore
@@ -224,8 +225,8 @@ export function SendersView() {
                                                 <TableCell>
                                                     <Typography variant="subtitle2">{row.sender}</Typography>
                                                 </TableCell>
+                                                <TableCell align="right">{row.jobCount.toLocaleString()}</TableCell>
                                                 <TableCell align="right">{row.total.toLocaleString()}</TableCell>
-                                                <TableCell align="right">{row.delivered.toLocaleString()}</TableCell>
                                                 <TableCell align="right">
                                                     <Typography
                                                         color={parseFloat(row.bounceRate) > 5 ? 'error.main' : parseFloat(row.bounceRate) > 3 ? 'warning.main' : 'text.primary'}

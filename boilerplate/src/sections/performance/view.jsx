@@ -57,6 +57,7 @@ export function PerformanceView() {
             setStats(prev => ({
                 ...prev,
                 avgLatency: generalStats.avgLatency || 0,
+                p95Latency: generalStats.p95Latency || 0,
                 throughput: generalStats.sent || 0
             }));
 
@@ -120,15 +121,15 @@ export function PerformanceView() {
                 <Grid xs={12} sm={6} md={3}>
                     <StatsCard
                         title="P95 Latency"
-                        value="Calculated"
+                        value={`${stats.p95Latency}s`}
                         color="warning"
                         icon="mdi:chart-timeline-variant"
                     />
                 </Grid>
                 <Grid xs={12} sm={6} md={3}>
                     <StatsCard
-                        title="P99 Latency"
-                        value="Calculated"
+                        title="Peak Latency"
+                        value={`${Math.max(stats.avgLatency, stats.p95Latency)}s`}
                         color="error"
                         icon="mdi:timer-alert"
                     />
