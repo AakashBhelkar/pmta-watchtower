@@ -23,6 +23,7 @@ export const paths = {
     performance: `${ROOTS.DASHBOARD}/performance`,
     domains: `${ROOTS.DASHBOARD}/domains`,
     senders: `${ROOTS.DASHBOARD}/senders`,
+    incidents: `${ROOTS.DASHBOARD}/incidents`,
     // Data pages
     events: `${ROOTS.DASHBOARD}/events`,
     upload: `${ROOTS.DASHBOARD}/upload`,

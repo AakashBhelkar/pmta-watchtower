@@ -40,7 +40,7 @@ export default defineConfig({
     host: true,
     proxy: {
       '/api': {
-        target: 'http://localhost:4000',
+        target: process.env.VITE_API_TARGET || env.VITE_API_TARGET || 'http://localhost:4000',
         changeOrigin: true,
       }
     }

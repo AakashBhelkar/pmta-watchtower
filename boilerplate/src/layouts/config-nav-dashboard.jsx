@@ -56,6 +56,11 @@ export const navData = [
         path: paths.dashboard.senders,
         icon: ICONS.user,
       },
+      {
+        title: 'System Incidents',
+        path: paths.dashboard.incidents,
+        icon: ICONS.ecommerce, // Using ecommerce icon as a placeholder for pulse/activity
+      },
     ],
   },
   /**

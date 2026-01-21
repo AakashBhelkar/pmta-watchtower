@@ -3,12 +3,31 @@ import axios from 'axios';
 // The proxy in vite.config.js handles routing /api to http://localhost:4000
 const axiosInstance = axios.create({
     baseURL: '/api',
+    timeout: 30000,
 });
+
+// Request interceptor for logging
+axiosInstance.interceptors.request.use(
+    (config) => {
+        console.debug(`API Request: ${config.method?.toUpperCase()} ${config.url}`);
+        return config;
+    },
+    (error) => Promise.reject(error)
+);
+
+// Response interceptor for error handling
+axiosInstance.interceptors.response.use(
+    (response) => response,
+    (error) => {
+        console.error('API Error:', error.response?.data || error.message);
+        return Promise.reject(error);
+    }
+);
 
 // ----------------------------------------------------------------------
 
 // File API
-export const uploadFiles = async (files) => {
+export const uploadFiles = async (files, onProgress) => {
     const formData = new FormData();
     files.forEach((file) => {
         formData.append('files', file);
@@ -18,12 +37,17 @@ export const uploadFiles = async (files) => {
         headers: {
             'Content-Type': 'multipart/form-data',
         },
+        onUploadProgress: onProgress,
     });
     return response.data;
 };
 
-export const getFiles = async () => {
-    const response = await axiosInstance.get('/files');
+export const getFiles = async (params = {}) => {
+    const response = await axiosInstance.get('/files', { params });
+    // Handle both old format (array) and new format (object with data)
+    if (Array.isArray(response.data)) {
+        return { data: response.data, pagination: { total: response.data.length } };
+    }
     return response.data;
 };
 
@@ -42,6 +66,12 @@ export const deleteFile = async (id) => {
 // Events API
 export const queryEvents = async (params) => {
     const response = await axiosInstance.get('/events', { params });
+    return response.data;
+};
+
+export const getRelatedEvents = async (messageId) => {
+    if (!messageId) return [];
+    const response = await axiosInstance.get(`/events/related/${messageId}`);
     return response.data;
 };
 
@@ -78,9 +108,23 @@ export const getInsights = async () => {
     return response.data;
 };
 
+export const getIncidents = async () => {
+    const response = await axiosInstance.get('/analytics/incidents');
+    return response.data;
+};
+
 export const getExportUrl = (params) => {
     const queryString = new URLSearchParams(params).toString();
     return `/api/analytics/export?${queryString}`;
 };
 
+// ----------------------------------------------------------------------
+
+// Health Check
+export const checkHealth = async () => {
+    const response = await axiosInstance.get('/health');
+    return response.data;
+};
+
 export default axiosInstance;
+

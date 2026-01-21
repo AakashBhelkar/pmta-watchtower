@@ -1,11 +1,12 @@
-# PMTA Analytics & Observability Platform
+# PMTA Analytics & Observability Platform - Frontend
 
 An internal observability platform for PowerMTA that ingests CSV logs, normalizes data, provides analytics, and visual insights.
 
 ## Features
 
-### MVP (Phase 1) - Implemented ✅
+### MVP (Phase 1) - ✅ Complete
 - **File Upload & Ingestion**: Drag-drop upload with auto file type detection
+- **Bulk Upload**: ZIP file extraction for batch processing
 - **CSV Parsing**: Streaming/chunked parsing for large files (50-200MB)
 - **Data Normalization**: Canonical event model for all PMTA file types
 - **Deduplication**: File hash-based duplicate detection
@@ -16,6 +17,12 @@ An internal observability platform for PowerMTA that ingests CSV logs, normalize
   - Sender/User Risk Analysis
   - Event Explorer with Filtering
   - File Manager
+
+### Phase 2 - ✅ Implemented
+- Event correlation via messageId
+- P95/P99 latency analytics
+- Automated incident detection (Throttling, Complaint Spikes)
+- Risk score persistence
 
 ### Supported File Types
 | Type | Description |
@@ -31,26 +38,29 @@ An internal observability platform for PowerMTA that ingests CSV logs, normalize
 ### Prerequisites
 - Node.js 18+
 - npm or yarn
-- Supabase account (optional, for data persistence)
+- Docker (for PostgreSQL)
+- Backend server running
 
 ### Installation
 
-1. **Install dependencies**:
+1. **Start the database** (from project root):
+   ```bash
+   docker-compose up -d
+   ```
+
+2. **Setup backend** (required first):
+   ```bash
+   cd backend
+   npm install
+   npx prisma migrate dev
+   npm run dev
+   ```
+
+3. **Install frontend dependencies**:
    ```bash
    cd boilerplate
    npm install
    ```
-
-2. **Configure environment** (optional):
-   Copy `.env` and add your Supabase credentials:
-   ```
-   VITE_SUPABASE_URL=your-supabase-url
-   VITE_SUPABASE_ANON_KEY=your-anon-key
-   ```
-
-3. **Set up database** (if using Supabase):
-   - Open Supabase SQL Editor
-   - Run the schema from `supabase/schema.sql`
 
 4. **Start development server**:
    ```bash
@@ -75,18 +85,13 @@ boilerplate/
 │   │   ├── upload/            # File Upload
 │   │   └── files/             # File Manager
 │   ├── services/              # API & utilities
-│   │   ├── supabase.js        # Supabase client
+│   │   ├── api.js             # Backend API client
 │   │   ├── file-parser.js     # CSV parsing
 │   │   └── index.js           # Exports
 │   ├── layouts/               # Dashboard layout
 │   ├── routes/                # Routing config
 │   └── components/            # Reusable UI
-├── supabase/
-│   └── schema.sql             # Database schema
 ├── sample-data/               # Test CSV files
-│   ├── sample_acct.csv
-│   ├── sample_bounce.csv
-│   └── sample_fbl.csv
 └── package.json
 ```
 
@@ -100,31 +105,31 @@ Sample PMTA CSV files are provided in `sample-data/` for testing:
 
 ### Upload Test
 1. Navigate to Upload Files page
-2. Drag and drop sample files
-3. Click "Process Files" to parse
+2. Drag and drop sample files (CSV or ZIP)
+3. Click "Upload & Process"
+4. Check File Manager for processing status
 
 ## Technology Stack
 
 - **Frontend**: React 18 + Vite
 - **UI Framework**: MUI v5 (Material UI)
-- **Charts**: Placeholder (add ApexCharts/Recharts)
-- **Database**: Supabase (PostgreSQL)
-- **CSV Parsing**: PapaParse
+- **Charts**: ApexCharts
+- **State**: React Hooks
+- **HTTP Client**: Axios
 
-## Roadmap
+## Backend API
 
-### Phase 2 (Planned)
-- [ ] Event correlation logic
-- [ ] P95/P99 latency analytics
-- [ ] Domain intelligence scoring
-- [ ] User impact views
+The frontend connects to a local Express.js backend via Vite proxy:
+- Frontend: http://localhost:3031
+- Backend: http://localhost:4000 (proxied as /api)
 
-### Phase 3 (Future)
-- [ ] Automated insights engine
-- [ ] Risk scoring
-- [ ] Alerting system
-- [ ] API access
+See `vite.config.js` for proxy configuration.
+
+## Documentation
+
+For complete documentation, see `../PMTA_WATCHTOWER_DOCS.md` in the project root.
 
 ## License
 
 Internal use only.
+

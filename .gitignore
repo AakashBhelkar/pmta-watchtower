@@ -1,14 +1,14 @@
 # Root .gitignore for PMTA Watchtower
 
-# Dependencies
-node_modules/
+# Dependencies 
+node_modules/ 
 boilerplate/node_modules/
 backend/node_modules/
 
-# Environment variables
-.env
-backend/.env
-boilerplate/.env
+# Environment variables (Included by user request)
+# .env
+# backend/.env
+# boilerplate/.env
 
 # Build outputs
 dist/

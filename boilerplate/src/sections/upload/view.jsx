@@ -172,7 +172,7 @@ export function UploadView() {
                                 <input
                                     type="file"
                                     multiple
-                                    accept=".csv,.txt"
+                                    accept=".csv,.txt,.zip"
                                     onChange={handleFileSelect}
                                     style={{ display: 'none' }}
                                 />

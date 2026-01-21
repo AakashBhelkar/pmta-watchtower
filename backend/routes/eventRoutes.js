@@ -3,8 +3,10 @@ const router = express.Router();
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 
+const { validate, schemas } = require('../middleware/validate');
+
 // Query events with filters
-router.get('/', async (req, res) => {
+router.get('/', validate(schemas.eventQuery), async (req, res) => {
     try {
         const {
             type,

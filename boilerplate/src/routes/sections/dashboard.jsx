@@ -17,6 +17,7 @@ const OverviewPage = lazy(() => import('src/pages/dashboard/overview'));
 const PerformancePage = lazy(() => import('src/pages/dashboard/performance'));
 const DomainsPage = lazy(() => import('src/pages/dashboard/domains'));
 const SendersPage = lazy(() => import('src/pages/dashboard/senders'));
+const IncidentsPage = lazy(() => import('src/pages/dashboard/incidents'));
 
 // Data
 const EventsPage = lazy(() => import('src/pages/dashboard/events'));
@@ -44,6 +45,7 @@ export const dashboardRoutes = [
       { path: 'performance', element: <PerformancePage /> },
       { path: 'domains', element: <DomainsPage /> },
       { path: 'senders', element: <SendersPage /> },
+      { path: 'incidents', element: <IncidentsPage /> },
       // Data
       { path: 'events', element: <EventsPage /> },
       { path: 'upload', element: <UploadPage /> },

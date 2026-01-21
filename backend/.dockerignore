@@ -1,0 +1,9 @@
+# Backend Docker Ignore
+node_modules
+npm-debug.log
+uploads/*
+!uploads/.gitkeep
+.env
+*.md
+.git
+.gitignore

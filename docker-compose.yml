@@ -1,30 +1,90 @@
 version: '3.8'
 
 services:
+  # PostgreSQL Database
   db:
     image: postgres:15-alpine
     container_name: pmta-watchtower-db
-    restart: always
+    restart: unless-stopped
     environment:
       POSTGRES_USER: pmta_user
       POSTGRES_PASSWORD: pmta_password
       POSTGRES_DB: pmta_analytics
     ports:
-      - "5432:5432"
+      - "5433:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U pmta_user -d pmta_analytics" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - pmta-network
 
+  # pgAdmin for database management
   pgadmin:
-    image: dpage/pgadmin4
+    image: dpage/pgadmin4:latest
     container_name: pmta-watchtower-pgadmin
-    restart: always
+    restart: unless-stopped
     environment:
-      PGADMIN_DEFAULT_EMAIL: admin@admin.com
-      PGADMIN_DEFAULT_PASSWORD: admin
+      PGADMIN_DEFAULT_EMAIL: admin@pmta.com
+      PGADMIN_DEFAULT_PASSWORD: admin123
+      PGADMIN_CONFIG_SERVER_MODE: 'False'
     ports:
       - "5050:80"
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
     depends_on:
-      - db
+      db:
+        condition: service_healthy
+    networks:
+      - pmta-network
+  # Backend API (Optional - for containerized deployment)
+  # Uncomment to run backend in Docker
+  # backend:
+  #   build:
+  #     context: ./backend
+  #     dockerfile: Dockerfile
+  #   container_name: pmta-watchtower-backend
+  #   restart: unless-stopped
+  #   environment:
+  #     DATABASE_URL: postgresql://pmta_user:pmta_password@db:5432/pmta_analytics?schema=public
+  #     PORT: 4000
+  #     NODE_ENV: production
+  #   ports:
+  #     - "4000:4000"
+  #   volumes:
+  #     - ./backend/uploads:/app/uploads
+  #   depends_on:
+  #     db:
+  #       condition: service_healthy
+  #   networks:
+  #     - pmta-network
+
+  # Frontend (Optional - for containerized deployment)
+  # Uncomment to run frontend in Docker
+  # frontend:
+  #   build:
+  #     context: ./boilerplate
+  #     dockerfile: Dockerfile
+  #   container_name: pmta-watchtower-frontend
+  #   restart: unless-stopped
+  #   environment:
+  #     VITE_API_URL: http://backend:4000
+  #   ports:
+  #     - "3031:3031"
+  #   depends_on:
+  #     - backend
+  #   networks:
+  #     - pmta-network
+
+networks:
+  pmta-network:
+    driver: bridge
 
 volumes:
   postgres_data:
+    driver: local
+  pgadmin_data:
+    driver: local

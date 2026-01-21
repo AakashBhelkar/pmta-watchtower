@@ -62,18 +62,30 @@ exports.processFile = async (fileId, filePath) => {
                 } catch (dbError) {
                     console.error(`DB Insert Error for file ${fileId}:`, dbError);
                     parser.abort();
-                    throw dbError;
+
+                    // Update file status effectively
+                    await prisma.file.update({
+                        where: { id: fileId },
+                        data: {
+                            processingStatus: 'error',
+                            errorLogs: { message: `Database error during ingestion: ${dbError.message}` }
+                        }
+                    }).catch(err => console.error('Failed to update error status:', err));
                 }
             },
             error: async (err) => {
                 console.error(`Parse Error for file ${fileId}:`, err);
-                await prisma.file.update({
-                    where: { id: fileId },
-                    data: {
-                        processingStatus: 'error',
-                        errorLogs: { message: err.message }
-                    }
-                });
+                try {
+                    await prisma.file.update({
+                        where: { id: fileId },
+                        data: {
+                            processingStatus: 'error',
+                            errorLogs: { message: err.message }
+                        }
+                    });
+                } catch (updateErr) {
+                    console.error('Failed to update parse error status:', updateErr);
+                }
                 this.cleanup(filePath);
             },
             complete: async () => {

@@ -24,6 +24,8 @@ import { DashboardContent } from 'src/layouts/dashboard';
 
 import { Iconify } from 'src/components/iconify';
 
+import { MessageTimeline } from './message-timeline';
+
 // ----------------------------------------------------------------------
 
 const EVENT_TYPE_OPTIONS = [
@@ -47,6 +49,8 @@ export function EventsView() {
         sender: '',
         domain: '',
     });
+    const [timelineOpen, setTimelineOpen] = useState(false);
+    const [selectedMessageId, setSelectedMessageId] = useState(null);
 
     const loadEvents = useCallback(async () => {
         setLoading(true);
@@ -77,6 +81,13 @@ export function EventsView() {
     const clearFilters = () => {
         setFilters({ type: '', jobId: '', sender: '', domain: '' });
         setPage(0);
+    };
+
+    const handleRowClick = (messageId) => {
+        if (messageId) {
+            setSelectedMessageId(messageId);
+            setTimelineOpen(true);
+        }
     };
 
     const getEventTypeChip = (type) => {
@@ -189,7 +200,12 @@ export function EventsView() {
                         </TableHead>
                         <TableBody>
                             {events.map((event) => (
-                                <TableRow key={event.id} hover sx={{ cursor: 'pointer' }}>
+                                <TableRow
+                                    key={event.id}
+                                    hover
+                                    sx={{ cursor: 'pointer' }}
+                                    onClick={() => handleRowClick(event.messageId)}
+                                >
                                     <TableCell>{getEventTypeChip(event.eventType)}</TableCell>
                                     <TableCell>
                                         <Typography variant="body2" sx={{ whiteSpace: 'nowrap' }}>
@@ -246,6 +262,12 @@ export function EventsView() {
                     rowsPerPageOptions={[10, 25, 50, 100]}
                 />
             </Card>
+
+            <MessageTimeline
+                open={timelineOpen}
+                onClose={() => setTimelineOpen(false)}
+                messageId={selectedMessageId}
+            />
         </DashboardContent>
     );
 }

@@ -3,6 +3,8 @@ import { useState, useEffect, useCallback } from 'react';
 import Box from '@mui/material/Box';
 import Card from '@mui/material/Card';
 import Chip from '@mui/material/Chip';
+import Stack from '@mui/material/Stack';
+import Button from '@mui/material/Button';
 import Table from '@mui/material/Table';
 import TableRow from '@mui/material/TableRow';
 import Grid from '@mui/material/Unstable_Grid2';
@@ -12,22 +14,18 @@ import TableHead from '@mui/material/TableHead';
 import CardHeader from '@mui/material/CardHeader';
 import Typography from '@mui/material/Typography';
 import TableContainer from '@mui/material/TableContainer';
+import CircularProgress from '@mui/material/CircularProgress';
 
 import { getStats, getDomainStats } from 'src/services';
 import { DashboardContent } from 'src/layouts/dashboard';
+
+import { Iconify } from 'src/components/iconify';
+import { DateRangePicker } from 'src/components/date-range-picker';
 
 import { StatsCard } from '../overview/stats-card';
 import { LatencyTrendChart } from './latency-trend-chart';
 
 // ----------------------------------------------------------------------
-
-const MOCK_LATENCY_DATA = [
-    { domain: 'gmail.com', count: 45200, avgLatency: 2.4, p95Latency: 8.2, status: 'normal' },
-    { domain: 'yahoo.com', count: 28100, avgLatency: 3.1, p95Latency: 11.5, status: 'warning' },
-    { domain: 'outlook.com', count: 22800, avgLatency: 1.8, p95Latency: 5.4, status: 'normal' },
-    { domain: 'hotmail.com', count: 15600, avgLatency: 2.1, p95Latency: 6.8, status: 'normal' },
-    { domain: 'aol.com', count: 8400, avgLatency: 4.5, p95Latency: 15.2, status: 'error' },
-];
 
 export function PerformanceView() {
     const [stats, setStats] = useState({
@@ -37,16 +35,25 @@ export function PerformanceView() {
         throughput: 0,
     });
     const [domainStats, setDomainStats] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [dateRange, setDateRange] = useState({
+        start: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000), // Last 7 days
+        end: new Date(),
+    });
 
     const loadData = useCallback(async () => {
+        setLoading(true);
         try {
+            const params = {
+                from: dateRange.start?.toISOString(),
+                to: dateRange.end?.toISOString(),
+            };
+
             const [generalStats, domains] = await Promise.all([
-                getStats(),
-                getDomainStats()
+                getStats(params),
+                getDomainStats(params)
             ]);
 
-            // We'll need to calculate p95/p99 on the backend later for the stats cards, 
-            // for now use the ones we have or placeholders.
             setStats(prev => ({
                 ...prev,
                 avgLatency: generalStats.avgLatency || 0,
@@ -56,18 +63,49 @@ export function PerformanceView() {
             setDomainStats(domains);
         } catch (error) {
             console.error('Failed to load performance data:', error);
+        } finally {
+            setLoading(false);
         }
-    }, []);
+    }, [dateRange]);
 
     useEffect(() => {
         loadData();
     }, [loadData]);
 
+    const handleRefresh = () => {
+        loadData();
+    };
+
     return (
         <DashboardContent maxWidth="xl">
-            <Typography variant="h4" sx={{ mb: 3 }}>
-                Performance & Latency
-            </Typography>
+            <Stack direction={{ xs: 'column', md: 'row' }} alignItems="center" justifyContent="space-between" sx={{ mb: 3 }} spacing={2}>
+                <Typography variant="h4">
+                    Performance & Latency
+                </Typography>
+
+                <Stack direction="row" spacing={2} alignItems="center">
+                    <DateRangePicker
+                        start={dateRange.start}
+                        end={dateRange.end}
+                        onChangeStart={(date) => setDateRange((prev) => ({ ...prev, start: date }))}
+                        onChangeEnd={(date) => setDateRange((prev) => ({ ...prev, end: date }))}
+                    />
+                    <Button
+                        variant="contained"
+                        startIcon={<Iconify icon="mdi:refresh" />}
+                        onClick={handleRefresh}
+                        disabled={loading}
+                    >
+                        Refresh
+                    </Button>
+                </Stack>
+            </Stack>
+
+            {loading && (
+                <Stack alignItems="center" sx={{ mb: 3 }}>
+                    <CircularProgress size={24} />
+                </Stack>
+            )}
 
             {/* Stats Cards */}
             <Grid container spacing={3} sx={{ mb: 3 }}>
@@ -108,7 +146,7 @@ export function PerformanceView() {
             {/* Latency Trends */}
             <Grid container spacing={3} sx={{ mb: 3 }}>
                 <Grid xs={12}>
-                    <LatencyTrendChart />
+                    <LatencyTrendChart dateRange={dateRange} />
                 </Grid>
             </Grid>
 

@@ -4,6 +4,7 @@ import Card from '@mui/material/Card';
 import Chip from '@mui/material/Chip';
 import Stack from '@mui/material/Stack';
 import Table from '@mui/material/Table';
+import Alert from '@mui/material/Alert';
 import Tooltip from '@mui/material/Tooltip';
 import TableRow from '@mui/material/TableRow';
 import TableBody from '@mui/material/TableBody';
@@ -16,6 +17,7 @@ import Typography from '@mui/material/Typography';
 import InputAdornment from '@mui/material/InputAdornment';
 import TableContainer from '@mui/material/TableContainer';
 import TablePagination from '@mui/material/TablePagination';
+import CircularProgress from '@mui/material/CircularProgress';
 
 import { getFiles, deleteFile } from 'src/services';
 import { DashboardContent } from 'src/layouts/dashboard';
@@ -43,17 +45,22 @@ const STATUS_CONFIG = {
 export function FilesView() {
     const [files, setFiles] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
     const [page, setPage] = useState(0);
     const [rowsPerPage, setRowsPerPage] = useState(10);
     const [search, setSearch] = useState('');
 
     const loadFiles = useCallback(async () => {
         setLoading(true);
+        setError(null);
         try {
-            const data = await getFiles();
-            setFiles(data);
-        } catch (error) {
-            console.error('Failed to load files:', error);
+            const response = await getFiles();
+            // Handle new API format with data property
+            const filesList = response.data || response;
+            setFiles(Array.isArray(filesList) ? filesList : []);
+        } catch (err) {
+            console.error('Failed to load files:', err);
+            setError('Failed to load files. Please check if the backend is running.');
         } finally {
             setLoading(false);
         }
@@ -84,8 +91,8 @@ export function FilesView() {
             try {
                 await deleteFile(id);
                 loadFiles();
-            } catch (error) {
-                console.error('Delete failed:', error);
+            } catch (err) {
+                console.error('Delete failed:', err);
             }
         }
     };
@@ -123,94 +130,109 @@ export function FilesView() {
                 />
             </Stack>
 
-            <Card>
-                <CardHeader title="Uploaded Files" />
-                <TableContainer>
-                    <Table>
-                        <TableHead>
-                            <TableRow>
-                                <TableCell>File Name</TableCell>
-                                <TableCell>Type</TableCell>
-                                <TableCell align="right">Size</TableCell>
-                                <TableCell>Upload Time</TableCell>
-                                <TableCell align="right">Rows</TableCell>
-                                <TableCell align="center">Status</TableCell>
-                                <TableCell align="center">Actions</TableCell>
-                            </TableRow>
-                        </TableHead>
-                        <TableBody>
-                            {filteredFiles
-                                .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
-                                .map((file) => (
-                                    <TableRow key={file.id} hover>
-                                        <TableCell>
-                                            <Stack direction="row" alignItems="center" spacing={1}>
-                                                <Iconify
-                                                    icon="mdi:file-document"
-                                                    width={24}
-                                                    sx={{ color: 'text.secondary' }}
+            {error && (
+                <Alert severity="error" sx={{ mb: 2 }}>
+                    {error}
+                </Alert>
+            )}
+
+            {loading && files.length === 0 ? (
+                <Stack alignItems="center" justifyContent="center" sx={{ py: 10 }}>
+                    <CircularProgress />
+                    <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
+                        Loading files...
+                    </Typography>
+                </Stack>
+            ) : (
+                <Card>
+                    <CardHeader title="Uploaded Files" />
+                    <TableContainer>
+                        <Table>
+                            <TableHead>
+                                <TableRow>
+                                    <TableCell>File Name</TableCell>
+                                    <TableCell>Type</TableCell>
+                                    <TableCell align="right">Size</TableCell>
+                                    <TableCell>Upload Time</TableCell>
+                                    <TableCell align="right">Rows</TableCell>
+                                    <TableCell align="center">Status</TableCell>
+                                    <TableCell align="center">Actions</TableCell>
+                                </TableRow>
+                            </TableHead>
+                            <TableBody>
+                                {filteredFiles
+                                    .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
+                                    .map((file) => (
+                                        <TableRow key={file.id} hover>
+                                            <TableCell>
+                                                <Stack direction="row" alignItems="center" spacing={1}>
+                                                    <Iconify
+                                                        icon="mdi:file-document"
+                                                        width={24}
+                                                        sx={{ color: 'text.secondary' }}
+                                                    />
+                                                    <Typography variant="subtitle2">{file.fileName}</Typography>
+                                                </Stack>
+                                            </TableCell>
+                                            <TableCell>
+                                                <Chip
+                                                    size="small"
+                                                    label={FILE_TYPE_CONFIG[file.fileType]?.label || file.fileType}
+                                                    color={FILE_TYPE_CONFIG[file.fileType]?.color || 'default'}
+                                                    sx={{ height: 22 }}
                                                 />
-                                                <Typography variant="subtitle2">{file.fileName}</Typography>
-                                            </Stack>
-                                        </TableCell>
-                                        <TableCell>
-                                            <Chip
-                                                size="small"
-                                                label={FILE_TYPE_CONFIG[file.fileType]?.label || file.fileType}
-                                                color={FILE_TYPE_CONFIG[file.fileType]?.color || 'default'}
-                                                sx={{ height: 22 }}
-                                            />
-                                        </TableCell>
-                                        <TableCell align="right">{formatFileSize(file.fileSize)}</TableCell>
-                                        <TableCell>
-                                            <Typography variant="body2">
-                                                {new Date(file.uploadTime).toLocaleString()}
-                                            </Typography>
-                                        </TableCell>
-                                        <TableCell align="right">
-                                            {file.rowCount ? file.rowCount.toLocaleString() : '-'}
-                                        </TableCell>
-                                        <TableCell align="center">
-                                            <Chip
-                                                size="small"
-                                                label={STATUS_CONFIG[file.processingStatus]?.label || file.processingStatus}
-                                                color={STATUS_CONFIG[file.processingStatus]?.color || 'default'}
-                                                sx={{ height: 22 }}
-                                            />
-                                        </TableCell>
-                                        <TableCell align="center">
-                                            <Stack direction="row" justifyContent="center" spacing={0.5}>
-                                                <Tooltip title="Delete">
-                                                    <IconButton size="small" color="error" onClick={() => handleDelete(file.id)}>
-                                                        <Iconify icon="mdi:delete" width={18} />
-                                                    </IconButton>
-                                                </Tooltip>
-                                            </Stack>
+                                            </TableCell>
+                                            <TableCell align="right">{formatFileSize(file.fileSize)}</TableCell>
+                                            <TableCell>
+                                                <Typography variant="body2">
+                                                    {new Date(file.uploadTime).toLocaleString()}
+                                                </Typography>
+                                            </TableCell>
+                                            <TableCell align="right">
+                                                {file.rowCount ? file.rowCount.toLocaleString() : '-'}
+                                            </TableCell>
+                                            <TableCell align="center">
+                                                <Chip
+                                                    size="small"
+                                                    label={STATUS_CONFIG[file.processingStatus]?.label || file.processingStatus}
+                                                    color={STATUS_CONFIG[file.processingStatus]?.color || 'default'}
+                                                    sx={{ height: 22 }}
+                                                />
+                                            </TableCell>
+                                            <TableCell align="center">
+                                                <Stack direction="row" justifyContent="center" spacing={0.5}>
+                                                    <Tooltip title="Delete">
+                                                        <IconButton size="small" color="error" onClick={() => handleDelete(file.id)}>
+                                                            <Iconify icon="mdi:delete" width={18} />
+                                                        </IconButton>
+                                                    </Tooltip>
+                                                </Stack>
+                                            </TableCell>
+                                        </TableRow>
+                                    ))}
+                                {filteredFiles.length === 0 && !loading && (
+                                    <TableRow>
+                                        <TableCell colSpan={7} align="center" sx={{ py: 10 }}>
+                                            <Typography variant="body2" color="text.secondary">No files uploaded yet.</Typography>
                                         </TableCell>
                                     </TableRow>
-                                ))}
-                            {filteredFiles.length === 0 && !loading && (
-                                <TableRow>
-                                    <TableCell colSpan={7} align="center" sx={{ py: 10 }}>
-                                        <Typography variant="body2" color="text.secondary">No files uploaded yet.</Typography>
-                                    </TableCell>
-                                </TableRow>
-                            )}
-                        </TableBody>
-                    </Table>
-                </TableContainer>
-                <TablePagination
-                    component="div"
-                    count={filteredFiles.length}
-                    page={page}
-                    onPageChange={(e, newPage) => setPage(newPage)}
-                    rowsPerPage={rowsPerPage}
-                    onRowsPerPageChange={(e) => {
-                        setRowsPerPage(parseInt(e.target.value, 10));
-                        setPage(0);
-                    }}
-                />
-            </Card>
+                                )}
+                            </TableBody>
+                        </Table>
+                    </TableContainer>
+                    <TablePagination
+                        component="div"
+                        count={filteredFiles.length}
+                        page={page}
+                        onPageChange={(e, newPage) => setPage(newPage)}
+                        rowsPerPage={rowsPerPage}
+                        onRowsPerPageChange={(e) => {
+                            setRowsPerPage(parseInt(e.target.value, 10));
+                            setPage(0);
+                        }}
+                    />
+                </Card>
+            )}
         </DashboardContent>
     );
 }

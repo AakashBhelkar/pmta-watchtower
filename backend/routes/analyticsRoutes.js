@@ -4,8 +4,10 @@ const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 const { Parser } = require('json2csv');
 
+const { validate, schemas } = require('../middleware/validate');
+
 // Export aggregated reports
-router.get('/export', async (req, res) => {
+router.get('/export', validate(schemas.analyticsQuery), async (req, res) => {
     try {
         const { from, to, type = 'domain' } = req.query;
         const where = {
@@ -62,8 +64,10 @@ router.get('/export', async (req, res) => {
     }
 });
 
+
+
 // Get aggregated stats
-router.get('/stats', async (req, res) => {
+router.get('/stats', validate(schemas.analyticsQuery), async (req, res) => {
     try {
         const { from, to } = req.query;
         const where = {
@@ -105,7 +109,7 @@ router.get('/stats', async (req, res) => {
 });
 
 // Get volume trends (grouped by hour)
-router.get('/volume', async (req, res) => {
+router.get('/volume', validate(schemas.analyticsQuery), async (req, res) => {
     try {
         const { from, to } = req.query;
         const volumeTrend = await prisma.$queryRaw`
@@ -128,7 +132,7 @@ router.get('/volume', async (req, res) => {
 });
 
 // Get latency trends (grouped by hour)
-router.get('/latency', async (req, res) => {
+router.get('/latency', validate(schemas.analyticsQuery), async (req, res) => {
     try {
         const { from, to } = req.query;
         const latencyTrend = await prisma.$queryRaw`
@@ -151,7 +155,7 @@ router.get('/latency', async (req, res) => {
 });
 
 // Get domain performance
-router.get('/domains', async (req, res) => {
+router.get('/domains', validate(schemas.analyticsQuery), async (req, res) => {
     try {
         const { from, to } = req.query;
         const where = {
@@ -187,7 +191,7 @@ router.get('/domains', async (req, res) => {
 });
 
 // Get sender performance and risk
-router.get('/senders', async (req, res) => {
+router.get('/senders', validate(schemas.analyticsQuery), async (req, res) => {
     try {
         const { from, to } = req.query;
         const where = {

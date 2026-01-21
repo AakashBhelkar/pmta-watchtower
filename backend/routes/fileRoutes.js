@@ -19,8 +19,10 @@ const upload = multer({
     limits: { fileSize: 200 * 1024 * 1024 } // 200MB limit
 });
 
+const { uploadLimiter } = require('../middleware/rateLimiter');
+
 // Routes
-router.post('/upload', upload.array('files'), fileController.uploadFiles);
+router.post('/upload', uploadLimiter, upload.array('files'), fileController.uploadFiles);
 router.get('/', fileController.getFiles);
 router.get('/:id', fileController.getFileById);
 router.delete('/:id', fileController.deleteFile);

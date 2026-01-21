@@ -1,10 +1,16 @@
 import { useState, useEffect, useCallback } from 'react';
 
+import Stack from '@mui/material/Stack';
+import Button from '@mui/material/Button';
 import Grid from '@mui/material/Unstable_Grid2';
 import Typography from '@mui/material/Typography';
+import CircularProgress from '@mui/material/CircularProgress';
 
 import { getStats } from 'src/services';
 import { DashboardContent } from 'src/layouts/dashboard';
+
+import { Iconify } from 'src/components/iconify';
+import { DateRangePicker } from 'src/components/date-range-picker';
 
 import { StatsCard } from './stats-card';
 import { TrendChart } from './trend-chart';
@@ -21,19 +27,35 @@ export function OverviewView() {
         complaints: 0,
         rbEvents: 0,
     });
+    const [loading, setLoading] = useState(false);
+    const [dateRange, setDateRange] = useState({
+        start: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000), // Last 7 days
+        end: new Date(),
+    });
 
     const loadStats = useCallback(async () => {
+        setLoading(true);
         try {
-            const data = await getStats();
+            const params = {
+                from: dateRange.start?.toISOString(),
+                to: dateRange.end?.toISOString(),
+            };
+            const data = await getStats(params);
             setStats(data);
         } catch (error) {
             console.error('Failed to load stats:', error);
+        } finally {
+            setLoading(false);
         }
-    }, []);
+    }, [dateRange]);
 
     useEffect(() => {
         loadStats();
     }, [loadStats]);
+
+    const handleRefresh = () => {
+        loadStats();
+    };
 
     const deliveryRate = stats.sent > 0 ? ((stats.delivered / stats.sent) * 100).toFixed(1) : '0';
     const deferredRate = stats.sent > 0 ? ((stats.deferred / stats.sent) * 100).toFixed(1) : '0';
@@ -41,9 +63,34 @@ export function OverviewView() {
 
     return (
         <DashboardContent maxWidth="xl">
-            <Typography variant="h4" sx={{ mb: 3 }}>
-                Global Health Dashboard
-            </Typography>
+            <Stack direction={{ xs: 'column', md: 'row' }} alignItems="center" justifyContent="space-between" sx={{ mb: 3 }} spacing={2}>
+                <Typography variant="h4">
+                    Global Health Dashboard
+                </Typography>
+
+                <Stack direction="row" spacing={2} alignItems="center">
+                    <DateRangePicker
+                        start={dateRange.start}
+                        end={dateRange.end}
+                        onChangeStart={(date) => setDateRange((prev) => ({ ...prev, start: date }))}
+                        onChangeEnd={(date) => setDateRange((prev) => ({ ...prev, end: date }))}
+                    />
+                    <Button
+                        variant="contained"
+                        startIcon={<Iconify icon="mdi:refresh" />}
+                        onClick={handleRefresh}
+                        disabled={loading}
+                    >
+                        Refresh
+                    </Button>
+                </Stack>
+            </Stack>
+
+            {loading && (
+                <Stack alignItems="center" sx={{ mb: 3 }}>
+                    <CircularProgress size={24} />
+                </Stack>
+            )}
 
             <Grid container spacing={3} sx={{ mb: 3 }}>
                 <Grid xs={12} sm={6} md={4} lg={2}>
@@ -101,7 +148,7 @@ export function OverviewView() {
 
             <Grid container spacing={3}>
                 <Grid xs={12} lg={8}>
-                    <TrendChart />
+                    <TrendChart dateRange={dateRange} />
                 </Grid>
                 <Grid xs={12} lg={4}>
                     <InsightsPanel />
@@ -110,3 +157,4 @@ export function OverviewView() {
         </DashboardContent>
     );
 }
+
