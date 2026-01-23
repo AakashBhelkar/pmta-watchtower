@@ -50,7 +50,7 @@ export function EventsView() {
         domain: '',
     });
     const [timelineOpen, setTimelineOpen] = useState(false);
-    const [selectedMessageId, setSelectedMessageId] = useState(null);
+    const [selectedEvent, setSelectedEvent] = useState(null);
 
     const loadEvents = useCallback(async () => {
         setLoading(true);
@@ -83,9 +83,9 @@ export function EventsView() {
         setPage(0);
     };
 
-    const handleRowClick = (messageId) => {
-        if (messageId) {
-            setSelectedMessageId(messageId);
+    const handleRowClick = (event) => {
+        if (event) {
+            setSelectedEvent(event);
             setTimelineOpen(true);
         }
     };
@@ -204,7 +204,7 @@ export function EventsView() {
                                     key={event.id}
                                     hover
                                     sx={{ cursor: 'pointer' }}
-                                    onClick={() => handleRowClick(event.messageId)}
+                                    onClick={() => handleRowClick(event)}
                                 >
                                     <TableCell>{getEventTypeChip(event.eventType)}</TableCell>
                                     <TableCell>
@@ -266,7 +266,10 @@ export function EventsView() {
             <MessageTimeline
                 open={timelineOpen}
                 onClose={() => setTimelineOpen(false)}
-                messageId={selectedMessageId}
+                messageId={selectedEvent?.messageId}
+                jobId={selectedEvent?.jobId}
+                recipient={selectedEvent?.recipient}
+                customHeader={selectedEvent?.customHeader}
             />
         </DashboardContent>
     );

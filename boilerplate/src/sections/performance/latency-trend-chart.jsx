@@ -4,10 +4,14 @@ import { useState, useEffect } from 'react';
 import Box from '@mui/material/Box';
 import Card from '@mui/material/Card';
 import CardHeader from '@mui/material/CardHeader';
+import Tooltip from '@mui/material/Tooltip';
+import IconButton from '@mui/material/IconButton';
+import Typography from '@mui/material/Typography';
 
 import { getLatencyTrend } from 'src/services';
 
 import Chart, { useChart } from 'src/components/chart';
+import { formatLatency } from 'src/utils/format-latency';
 
 // ----------------------------------------------------------------------
 
@@ -42,8 +46,8 @@ export function LatencyTrendChart({ dateRange }) {
                     return new Date(item.time).toLocaleString([], format);
                 });
 
-                const avgData = data.map(item => parseFloat(item.avgLatency).toFixed(2));
-                const p95Data = data.map(item => parseFloat(item.p95Latency).toFixed(2));
+                const avgData = data.map(item => Number.parseFloat(item.avgLatency) || 0);
+                const p95Data = data.map(item => Number.parseFloat(item.p95Latency) || 0);
 
                 setCategories(cats);
                 setSeries([
@@ -64,19 +68,30 @@ export function LatencyTrendChart({ dateRange }) {
         },
         tooltip: {
             y: {
-                formatter: (value) => `${value}s`,
+                formatter: (value) => formatLatency(value).display,
             },
         },
         yaxis: {
             title: {
-                text: 'Seconds',
+                text: 'Latency',
             },
+            labels: { formatter: (value) => formatLatency(value).display },
         },
     });
 
     return (
         <Card sx={{ height: '100%' }}>
-            <CardHeader title="Latency Trends" subheader="Delivery latency over time (seconds)" />
+            <CardHeader
+                title="Latency Trends"
+                subheader="Delivery latency over time (auto-switches to minutes when above 60s)"
+                action={(
+                    <Tooltip title="Hover the line to see precise latency. Values over 60s are shown in minutes." arrow>
+                        <IconButton size="small">
+                            <Typography variant="body2">i</Typography>
+                        </IconButton>
+                    </Tooltip>
+                )}
+            />
             <Box sx={{ mt: 3, mx: 3 }}>
                 <Chart
                     type="line"

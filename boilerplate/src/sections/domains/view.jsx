@@ -18,11 +18,13 @@ import TableContainer from '@mui/material/TableContainer';
 import LinearProgress from '@mui/material/LinearProgress';
 import TableSortLabel from '@mui/material/TableSortLabel';
 import CircularProgress from '@mui/material/CircularProgress';
+import Tooltip from '@mui/material/Tooltip';
 
 import { getDomainStats } from 'src/services';
 import { DateRangePicker } from 'src/components/date-range-picker';
 import { DashboardContent } from 'src/layouts/dashboard';
 import { Iconify } from 'src/components/iconify';
+import { formatLatency } from 'src/utils/format-latency';
 
 // ----------------------------------------------------------------------
 
@@ -68,7 +70,7 @@ export function DomainsView() {
         return <Chip size="small" label="Poor" color="error" sx={{ height: 22 }} />;
     };
 
-    const totalSent = domains.reduce((sum, d) => sum + (d.total || 0), 0);
+    const totalSent = domains.reduce((sum, d) => sum + (d.messageAttempts || 0), 0);
     const totalDelivered = domains.reduce((sum, d) => sum + (d.delivered || 0), 0);
     const totalBounced = domains.reduce((sum, d) => sum + (d.bounced || 0), 0);
     const totalComplaints = domains.reduce((sum, d) => sum + (d.complaints || 0), 0);
@@ -168,19 +170,23 @@ export function DomainsView() {
                             </TableHead>
                             <TableBody>
                                 {domains.map((row) => {
-                                    const deliveryRate = row.total > 0 ? ((row.delivered / row.total) * 100) : 0;
+                                    const deliveryRate = row.messageAttempts > 0 ? ((row.delivered / row.messageAttempts) * 100) : 0;
                                     return (
                                         <TableRow key={row.domain} hover>
                                             <TableCell>
                                                 <Typography variant="subtitle2">{row.domain}</Typography>
                                             </TableCell>
-                                            <TableCell align="right">{(row.total || 0).toLocaleString()}</TableCell>
+                                            <TableCell align="right">{(row.messageAttempts || 0).toLocaleString()}</TableCell>
                                             <TableCell align="right">{(row.delivered || 0).toLocaleString()}</TableCell>
                                             <TableCell align="right">
                                                 <Typography color="error.main">{(row.bounced || 0).toLocaleString()}</Typography>
                                             </TableCell>
                                             <TableCell align="right">{(row.complaints || 0).toLocaleString()}</TableCell>
-                                            <TableCell align="right">{row.avgLatency || 0}s</TableCell>
+                                            <TableCell align="right">
+                                                <Tooltip title="Latency shows minutes when above 60s" arrow>
+                                                    <span>{formatLatency(row.avgLatency).display}</span>
+                                                </Tooltip>
+                                            </TableCell>
                                             <TableCell align="center" sx={{ minWidth: 140 }}>
                                                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                                                     <LinearProgress

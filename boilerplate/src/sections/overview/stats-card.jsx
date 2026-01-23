@@ -3,12 +3,13 @@ import Card from '@mui/material/Card';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import CardContent from '@mui/material/CardContent';
+import Tooltip from '@mui/material/Tooltip';
 
 import { Iconify } from 'src/components/iconify';
 
 // ----------------------------------------------------------------------
 
-export function StatsCard({ title, value, color = 'primary', icon, percentage }) {
+export function StatsCard({ title, value, color = 'primary', icon, percentage, tooltip }) {
     const colorMap = {
         primary: 'primary.main',
         success: 'success.main',
@@ -26,16 +27,18 @@ export function StatsCard({ title, value, color = 'primary', icon, percentage })
     };
 
     const formatNumber = (num) => {
-        if (num >= 1000000) {
-            return `${(num / 1000000).toFixed(1)}M`;
+        const safeNum = typeof num === 'number' ? num : Number(num);
+        if (Number.isNaN(safeNum)) return num;
+        if (safeNum >= 1000000) {
+            return `${(safeNum / 1000000).toFixed(1)}M`;
         }
-        if (num >= 1000) {
-            return `${(num / 1000).toFixed(1)}K`;
+        if (safeNum >= 1000) {
+            return `${(safeNum / 1000).toFixed(1)}K`;
         }
-        return num.toLocaleString();
+        return safeNum.toLocaleString();
     };
 
-    return (
+    const content = (
         <Card
             sx={{
                 height: '100%',
@@ -50,7 +53,7 @@ export function StatsCard({ title, value, color = 'primary', icon, percentage })
                             {title}
                         </Typography>
                         <Typography variant="h4" sx={{ color: colorMap[color] }}>
-                            {formatNumber(value)}
+                            {typeof value === 'number' ? formatNumber(value) : value}
                         </Typography>
                         {percentage && (
                             <Typography variant="caption" color="text.secondary">
@@ -74,5 +77,17 @@ export function StatsCard({ title, value, color = 'primary', icon, percentage })
                 </Stack>
             </CardContent>
         </Card>
+    );
+
+    if (!tooltip) {
+        return content;
+    }
+
+    return (
+        <Tooltip title={tooltip} arrow placement="top" describeChild>
+            <Box sx={{ width: '100%' }}>
+                {content}
+            </Box>
+        </Tooltip>
     );
 }

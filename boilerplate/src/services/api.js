@@ -69,10 +69,28 @@ export const queryEvents = async (params) => {
     return response.data;
 };
 
-export const getRelatedEvents = async (messageId) => {
-    if (!messageId) return [];
-    const response = await axiosInstance.get(`/events/related/${messageId}`);
-    return response.data;
+export const getRelatedEvents = async (params) => {
+    if (!params) return [];
+    const { messageId, jobId, recipient, customHeader, from, to } = params;
+
+    if (!messageId && !jobId && !recipient && !customHeader) return [];
+
+    const query = new URLSearchParams();
+    if (jobId) query.append('jobId', jobId);
+    if (recipient) query.append('recipient', recipient);
+    if (customHeader) query.append('customHeader', customHeader);
+    if (from) query.append('from', from);
+    if (to) query.append('to', to);
+
+    const idPart = encodeURIComponent(messageId ?? 'null');
+    const qs = query.toString();
+
+    const response = await axiosInstance.get(`/events/related/${idPart}${qs ? `?${qs}` : ''}`);
+    const data = response.data;
+
+    // Backward compatibility: older backend may return plain array
+    if (Array.isArray(data)) return data;
+    return data.events || [];
 };
 
 // ----------------------------------------------------------------------

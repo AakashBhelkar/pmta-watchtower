@@ -37,9 +37,9 @@ async function seed() {
                 .toJSDate();
 
             const domain = domains[Math.floor(Math.random() * domains.length)];
-            const type = Math.random() > 0.2 ? 'acct' : (Math.random() > 0.5 ? 'bounce' : 'fbl');
+            const type = Math.random() > 0.2 ? 'tran' : (Math.random() > 0.5 ? 'bounce' : 'fbl');
             const sender = senders[Math.floor(Math.random() * senders.length)];
-            const status = type === 'acct' ? '250' : statusCodes[Math.floor(Math.random() * statusCodes.length)];
+            const status = (type === 'tran' || type === 'acct') ? '250' : statusCodes[Math.floor(Math.random() * statusCodes.length)];
 
             events.push({
                 eventType: type,
@@ -52,8 +52,8 @@ async function seed() {
                 vmta: vmtas[Math.floor(Math.random() * vmtas.length)],
                 smtpStatus: status,
                 bounceCategory: type === 'bounce' ? (Math.random() > 0.5 ? 'hard' : 'soft') : null,
-                deliveryLatency: type === 'acct' ? (Math.random() * 5) : null,
-                dsnAction: type === 'acct' ? 'delivered' : 'failed',
+                deliveryLatency: (type === 'acct' || type === 'tran') ? (Math.random() * 5) : null,
+                dsnAction: (type === 'acct' || type === 'tran') ? 'delivered' : 'failed',
             });
         }
 

@@ -48,30 +48,16 @@ export function SendersView() {
             };
             const data = await getSenderStats(params);
 
-            // Calculate rates and risk scores
-            const enriched = (Array.isArray(data) ? data : []).map((s, idx) => {
-                const bounceRate = s.total > 0 ? (s.bounced / s.total) * 100 : 0;
-                const complaintRate = s.total > 0 ? (s.complaints / s.total) * 100 : 0;
-
-                // Use backend risk if provided, otherwise calculate
-                let riskScore = s.riskLevel || 'low';
-                if (!s.riskLevel) {
-                    if (bounceRate > 10 || complaintRate > 0.5) riskScore = 'critical';
-                    else if (bounceRate > 5 || complaintRate > 0.2) riskScore = 'high';
-                    else if (bounceRate > 2 || complaintRate > 0.1) riskScore = 'medium';
-                }
-
-                return {
-                    id: idx,
-                    sender: s.sender,
-                    total: s.total || 0,
-                    delivered: s.delivered || 0,
-                    jobCount: s.jobCount || 0,
-                    bounceRate: bounceRate.toFixed(2),
-                    complaintRate: complaintRate.toFixed(2),
-                    riskScore
-                };
-            });
+            const enriched = (Array.isArray(data) ? data : []).map((s, idx) => ({
+                id: idx,
+                sender: s.sender,
+                total: s.messageAttempts || 0,
+                delivered: s.delivered || 0,
+                jobCount: s.jobCount || 0,
+                bounceRate: (s.bounceRate || '0.00').toString(),
+                complaintRate: (s.complaintRate || '0.00').toString(),
+                riskScore: s.riskLevel || 'low'
+            }));
 
             setSenders(enriched);
         } catch (err) {

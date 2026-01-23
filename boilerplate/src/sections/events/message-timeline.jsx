@@ -20,19 +20,37 @@ import TimelineOppositeContent from '@mui/lab/TimelineOppositeContent';
 import { getRelatedEvents } from 'src/services';
 import { Iconify } from 'src/components/iconify';
 
-export function MessageTimeline({ messageId, open, onClose }) {
+export function MessageTimeline({ messageId, jobId, recipient, customHeader, open, onClose }) {
     const [events, setEvents] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [correlation, setCorrelation] = useState({ method: '', key: '' });
 
     useEffect(() => {
-        if (open && messageId) {
+        if (open) {
             setLoading(true);
-            getRelatedEvents(messageId)
-                .then(data => setEvents(data))
+            const params = {
+                messageId: messageId || null,
+                jobId: jobId || null,
+                recipient: recipient || null,
+                customHeader: customHeader || null,
+            };
+            getRelatedEvents(params)
+                .then((data) => {
+                    if (Array.isArray(data)) {
+                        setEvents(data);
+                        setCorrelation({ method: messageId ? 'messageId' : '', key: messageId || '' });
+                    } else {
+                        setEvents(data.events || []);
+                        setCorrelation({
+                            method: data.correlationMethod || '',
+                            key: data.correlationKey || '',
+                        });
+                    }
+                })
                 .catch(err => console.error(err))
                 .finally(() => setLoading(false));
         }
-    }, [open, messageId]);
+    }, [open, messageId, jobId, recipient, customHeader]);
 
     const getEventIcon = (type) => {
         switch (type) {
@@ -60,9 +78,16 @@ export function MessageTimeline({ messageId, open, onClose }) {
         <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
             <DialogTitle>
                 Message Timeline
-                <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                    ID: {messageId}
-                </Typography>
+                {correlation.method && (
+                    <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                        Correlated by {correlation.method} {correlation.key ? `(${correlation.key})` : ''}
+                    </Typography>
+                )}
+                {messageId && (
+                    <Typography variant="body2" color="text.secondary">
+                        Message-ID: {messageId}
+                    </Typography>
+                )}
             </DialogTitle>
             <DialogContent dividers>
                 {loading ? (
@@ -113,6 +138,9 @@ export function MessageTimeline({ messageId, open, onClose }) {
 
 MessageTimeline.propTypes = {
     messageId: PropTypes.string,
+    jobId: PropTypes.string,
+    recipient: PropTypes.string,
+    customHeader: PropTypes.string,
     open: PropTypes.bool,
     onClose: PropTypes.func,
 };

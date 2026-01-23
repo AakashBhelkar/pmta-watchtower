@@ -20,12 +20,11 @@ import { InsightsPanel } from './insights-panel';
 
 export function OverviewView() {
     const [stats, setStats] = useState({
-        sent: 0,
-        delivered: 0,
-        deferred: 0,
-        bounced: 0,
-        complaints: 0,
-        rbEvents: 0,
+        messageAttempts: 0,
+        deliveredMessages: 0,
+        deferredMessages: 0,
+        bouncedMessages: 0,
+        complaintMessages: 0,
     });
     const [loading, setLoading] = useState(false);
     const [dateRange, setDateRange] = useState({
@@ -57,9 +56,10 @@ export function OverviewView() {
         loadStats();
     };
 
-    const deliveryRate = stats.sent > 0 ? ((stats.delivered / stats.sent) * 100).toFixed(1) : '0';
-    const deferredRate = stats.sent > 0 ? ((stats.deferred / stats.sent) * 100).toFixed(1) : '0';
-    const bounceRate = stats.sent > 0 ? ((stats.bounced / stats.sent) * 100).toFixed(1) : '0';
+    const attempts = stats.messageAttempts || 0;
+    const deliveryRate = attempts > 0 ? ((stats.deliveredMessages / attempts) * 100).toFixed(1) : '0';
+    const deferredRate = attempts > 0 ? ((stats.deferredMessages / attempts) * 100).toFixed(1) : '0';
+    const bounceRate = attempts > 0 ? ((stats.bouncedMessages / attempts) * 100).toFixed(1) : '0';
 
     return (
         <DashboardContent maxWidth="xl">
@@ -95,53 +95,59 @@ export function OverviewView() {
             <Grid container spacing={3} sx={{ mb: 3 }}>
                 <Grid xs={12} sm={6} md={4} lg={2}>
                     <StatsCard
-                        title="Sent"
-                        value={stats.sent}
+                        title="Message Attempts"
+                        value={stats.messageAttempts}
                         color="primary"
                         icon="mdi:email-send"
+                        tooltip="Unique message attempts (deduped by messageId or job+recipient)."
                     />
                 </Grid>
                 <Grid xs={12} sm={6} md={4} lg={2}>
                     <StatsCard
                         title="Delivered"
-                        value={stats.delivered}
+                        value={stats.deliveredMessages}
                         color="success"
                         icon="mdi:email-check"
                         percentage={deliveryRate}
+                        tooltip="Delivered message attempts / total attempts."
                     />
                 </Grid>
                 <Grid xs={12} sm={6} md={4} lg={2}>
                     <StatsCard
                         title="Deferred"
-                        value={stats.deferred}
+                        value={stats.deferredMessages}
                         color="warning"
                         icon="mdi:email-sync"
                         percentage={deferredRate}
+                        tooltip="Deferred message attempts / total attempts."
                     />
                 </Grid>
                 <Grid xs={12} sm={6} md={4} lg={2}>
                     <StatsCard
                         title="Bounced"
-                        value={stats.bounced}
+                        value={stats.bouncedMessages}
                         color="error"
                         icon="mdi:email-remove"
                         percentage={bounceRate}
+                        tooltip="Bounced message attempts / total attempts."
                     />
                 </Grid>
                 <Grid xs={12} sm={6} md={4} lg={2}>
                     <StatsCard
                         title="Complaints"
-                        value={stats.complaints}
+                        value={stats.complaintMessages}
                         color="error"
                         icon="mdi:alert-circle"
+                        tooltip="Complaint (FBL) message attempts."
                     />
                 </Grid>
                 <Grid xs={12} sm={6} md={4} lg={2}>
                     <StatsCard
-                        title="RB Events"
-                        value={stats.rbEvents}
-                        color="warning"
-                        icon="mdi:block-helper"
+                        title="Avg Latency"
+                        value={stats.avgLatency}
+                        color="info"
+                        icon="mdi:speedometer"
+                        tooltip="Average delivery latency for delivered attempts (seconds; UI auto-switches to minutes when over 60s)."
                     />
                 </Grid>
             </Grid>

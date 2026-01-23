@@ -22,6 +22,7 @@ exports.aggregateFileData = async (fileId) => {
                 "sender",
                 "recipientDomain",
                 "vmta",
+                "fileId",
                 "totalCount",
                 "delivered",
                 "bounced",
@@ -38,6 +39,7 @@ exports.aggregateFileData = async (fileId) => {
                 "sender",
                 "recipientDomain",
                 "vmta",
+                '${fileId}' as "fileId",
                 COUNT(*) as "totalCount",
                 SUM(CASE WHEN "eventType" = 'tran' THEN 1 ELSE 0 END) as "delivered",
                 SUM(CASE WHEN "eventType" IN ('bounce', 'rb') THEN 1 ELSE 0 END) as "bounced",
@@ -49,7 +51,7 @@ exports.aggregateFileData = async (fileId) => {
             WHERE "fileId" = '${fileId}'
               AND "eventTimestamp" IS NOT NULL
             GROUP BY 2, 3, 4, 5, 6, 7
-            ON CONFLICT ("timeBucket", "eventType", "jobId", "sender", "recipientDomain", "vmta") 
+            ON CONFLICT ("timeBucket", "eventType", "jobId", "sender", "recipientDomain", "vmta", "fileId") 
             DO UPDATE SET
                 "totalCount" = "AggregateMinute"."totalCount" + EXCLUDED."totalCount",
                 "delivered" = "AggregateMinute"."delivered" + EXCLUDED."delivered",
@@ -79,27 +81,55 @@ exports.updateRiskScores = async (fileId) => {
     try {
         console.log(`🛡️ Updating risk scores for file: ${fileId}`);
 
-        // 1. Calculate risks for Senders
+        // 1. Calculate risks for Senders using message-attempt-based denominators
         const senderRisks = await prisma.$queryRaw`
-            SELECT 
-                "sender" as "entityValue",
-                CAST(COUNT(*) FILTER (WHERE "eventType" = 'fbl') AS FLOAT) / NULLIF(COUNT(*) FILTER (WHERE "eventType" = 'acct'), 0) * 100 as "complaintRate",
-                CAST(COUNT(*) FILTER (WHERE "eventType" = 'bounce') AS FLOAT) / NULLIF(COUNT(*) FILTER (WHERE "eventType" = 'acct'), 0) * 100 as "bounceRate"
-            FROM "Event"
-            WHERE "fileId" = ${fileId} AND "sender" IS NOT NULL
+            WITH filtered AS (
+                SELECT
+                    "sender",
+                    COALESCE("messageId", CONCAT_WS(':', "jobId", "recipient")) AS message_key,
+                    "eventType"
+                FROM "Event"
+                WHERE "fileId" = ${fileId}
+                  AND "sender" IS NOT NULL
+            )
+            SELECT
+                "sender" AS "entityValue",
+                COUNT(DISTINCT message_key)                       AS "messageAttempts",
+                COUNT(DISTINCT message_key) FILTER (WHERE "eventType" = 'fbl')        AS "complaintMessages",
+                COUNT(DISTINCT message_key) FILTER (WHERE "eventType" IN ('bounce','rb')) AS "bouncedMessages"
+            FROM filtered
             GROUP BY "sender"
         `;
 
         for (const sr of senderRisks) {
-            const riskScore = Math.min(100, Math.round((sr.complaintRate || 0) * 40 + (sr.bounceRate || 0) * 10));
-            const riskLevel = riskScore > 80 ? 'critical' : riskScore > 60 ? 'high' : riskScore > 30 ? 'medium' : 'low';
+            const attempts = Number(sr.messageAttempts || 0);
+            const complaintMessages = Number(sr.complaintMessages || 0);
+            const bouncedMessages = Number(sr.bouncedMessages || 0);
+
+            const complaintRate = attempts > 0 ? (complaintMessages / attempts) * 100 : 0;
+            const bounceRate = attempts > 0 ? (bouncedMessages / attempts) * 100 : 0;
+
+            // Risk score: complaints are heavily weighted, bounces moderately
+            const rawScore = complaintRate * 40 + bounceRate * 20;
+            const riskScore = Math.min(100, Math.round(rawScore));
+
+            const riskLevel =
+                riskScore > 80 ? 'critical' :
+                riskScore > 60 ? 'high' :
+                riskScore > 30 ? 'medium' : 'low';
 
             await prisma.riskScore.upsert({
                 where: { entityType_entityValue: { entityType: 'user', entityValue: sr.entityValue } },
                 update: {
                     riskScore,
                     riskLevel,
-                    contributingFactors: { complaintRate: sr.complaintRate, bounceRate: sr.bounceRate },
+                    contributingFactors: {
+                        messageAttempts: attempts,
+                        complaintMessages,
+                        bouncedMessages,
+                        complaintRate,
+                        bounceRate,
+                    },
                     calculatedAt: new Date()
                 },
                 create: {
@@ -107,7 +137,13 @@ exports.updateRiskScores = async (fileId) => {
                     entityValue: sr.entityValue,
                     riskScore,
                     riskLevel,
-                    contributingFactors: { complaintRate: sr.complaintRate, bounceRate: sr.bounceRate }
+                    contributingFactors: {
+                        messageAttempts: attempts,
+                        complaintMessages,
+                        bouncedMessages,
+                        complaintRate,
+                        bounceRate,
+                    }
                 }
             });
         }

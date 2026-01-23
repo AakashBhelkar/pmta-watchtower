@@ -70,47 +70,48 @@ router.get('/export', validate(schemas.analyticsQuery), async (req, res) => {
 router.get('/stats', validate(schemas.analyticsQuery), async (req, res) => {
     try {
         const { from, to } = req.query;
-        const where = {
-            timeBucket: {
+        const whereEvents = {
+            eventTimestamp: {
                 gte: from ? new Date(from) : undefined,
                 lte: to ? new Date(to) : undefined,
             }
         };
 
-        const aggregation = await prisma.aggregateMinute.aggregate({
-            _sum: {
-                totalCount: true,
-                delivered: true,
-                bounced: true,
-                deferred: true,
-                complaints: true
-            },
-            _avg: {
-                avgLatencyMs: true,
-            },
-            _max: {
-                p95LatencyMs: true
-            },
-            where
+        // Message-attempt-based metrics derived directly from Event to avoid double-counting
+        const statsRows = await prisma.$queryRaw`
+            WITH filtered AS (
+                SELECT
+                    COALESCE("messageId", CONCAT_WS(':', "jobId", "recipient")) AS message_key,
+                    "eventType",
+                    "dsnAction",
+                    "deliveryLatency",
+                    "eventTimestamp"
+                FROM "Event"
+                WHERE "eventTimestamp" >= ${whereEvents.eventTimestamp.gte || new Date(0)}
+                  AND "eventTimestamp" <= ${whereEvents.eventTimestamp.lte || new Date()}
+            )
+            SELECT
+                COUNT(DISTINCT message_key) AS "messageAttempts",
+                COUNT(DISTINCT message_key) FILTER (WHERE "eventType" = 'tran') AS "deliveredMessages",
+                COUNT(DISTINCT message_key) FILTER (WHERE "eventType" IN ('bounce','rb')) AS "bouncedMessages",
+                COUNT(DISTINCT message_key) FILTER (WHERE "eventType" = 'acct' AND "dsnAction" = 'delayed') AS "deferredMessages",
+                COUNT(DISTINCT message_key) FILTER (WHERE "eventType" = 'fbl') AS "complaintMessages",
+                AVG("deliveryLatency") FILTER (WHERE "eventType" = 'tran') AS "avgLatencySeconds",
+                PERCENTILE_CONT(0.95) WITHIN GROUP (ORDER BY "deliveryLatency") FILTER (WHERE "eventType" = 'tran') AS "p95LatencySeconds"
+            FROM filtered;
+        `;
+
+        const statsRow = statsRows[0] || {};
+
+        res.json({
+            messageAttempts: Number(statsRow.messageAttempts || 0),
+            deliveredMessages: Number(statsRow.deliveredMessages || 0),
+            bouncedMessages: Number(statsRow.bouncedMessages || 0),
+            deferredMessages: Number(statsRow.deferredMessages || 0),
+            complaintMessages: Number(statsRow.complaintMessages || 0),
+            avgLatency: statsRow.avgLatencySeconds ? Number(statsRow.avgLatencySeconds).toFixed(2) : 0,
+            p95Latency: statsRow.p95LatencySeconds ? Number(statsRow.p95LatencySeconds).toFixed(2) : 0,
         });
-
-        const rbCounts = await prisma.aggregateMinute.aggregate({
-            _sum: { totalCount: true },
-            where: { ...where, eventType: 'rb' }
-        });
-
-        const stats = {
-            sent: aggregation._sum.totalCount || 0,
-            delivered: aggregation._sum.delivered || 0,
-            bounced: aggregation._sum.bounced || 0,
-            deferred: aggregation._sum.deferred || 0,
-            complaints: aggregation._sum.complaints || 0,
-            rbEvents: rbCounts._sum.totalCount || 0,
-            avgLatency: aggregation._avg.avgLatencyMs ? (aggregation._avg.avgLatencyMs / 1000).toFixed(2) : 0,
-            p95Latency: aggregation._max.p95LatencyMs ? (aggregation._max.p95LatencyMs / 1000).toFixed(2) : 0,
-        };
-
-        res.json(stats);
     } catch (error) {
         res.status(500).json({ error: 'Failed to fetch stats' });
     }
@@ -119,6 +120,11 @@ router.get('/stats', validate(schemas.analyticsQuery), async (req, res) => {
 // Get volume trends (grouped by hour)
 router.get('/volume', validate(schemas.analyticsQuery), async (req, res) => {
     try {
+        const fileCount = await prisma.file.count();
+        if (fileCount === 0) {
+            return res.json([]);
+        }
+
         const { from, to } = req.query;
         const volumeTrend = await prisma.$queryRaw`
             SELECT 
@@ -143,6 +149,11 @@ router.get('/volume', validate(schemas.analyticsQuery), async (req, res) => {
 // Get latency trends (grouped by hour)
 router.get('/latency', validate(schemas.analyticsQuery), async (req, res) => {
     try {
+        const fileCount = await prisma.file.count();
+        if (fileCount === 0) {
+            return res.json([]);
+        }
+
         const { from, to } = req.query;
         const latencyTrend = await prisma.$queryRaw`
             SELECT 
@@ -167,31 +178,47 @@ router.get('/latency', validate(schemas.analyticsQuery), async (req, res) => {
 // Get domain performance
 router.get('/domains', validate(schemas.analyticsQuery), async (req, res) => {
     try {
-        const { from, to } = req.query;
-        const where = {
-            timeBucket: {
-                gte: from ? new Date(from) : undefined,
-                lte: to ? new Date(to) : undefined,
-            },
-            recipientDomain: { not: null }
-        };
+        const fileCount = await prisma.file.count();
+        if (fileCount === 0) {
+            return res.json([]);
+        }
 
-        const domainStats = await prisma.aggregateMinute.groupBy({
-            by: ['recipientDomain'],
-            _sum: { totalCount: true, delivered: true, bounced: true, complaints: true },
-            _avg: { avgLatencyMs: true },
-            where,
-            orderBy: { _sum: { totalCount: 'desc' } },
-            take: 100
-        });
+        const { from, to } = req.query;
+        const fromDate = from ? new Date(from).toISOString() : '1970-01-01T00:00:00.000Z';
+        const toDate = to ? new Date(to).toISOString() : '3000-01-01T00:00:00.000Z';
+
+        const domainStats = await prisma.$queryRawUnsafe(`
+            WITH filtered AS (
+                SELECT
+                    "recipientDomain",
+                    COALESCE("messageId", CONCAT_WS(':', "jobId", "recipient")) AS message_key,
+                    "eventType",
+                    "deliveryLatency"
+                FROM "Event"
+                WHERE "eventTimestamp" >= '${fromDate}'
+                  AND "eventTimestamp" <= '${toDate}'
+                  AND "recipientDomain" IS NOT NULL
+            )
+            SELECT
+                "recipientDomain" AS domain,
+                COUNT(DISTINCT message_key) AS "messageAttempts",
+                COUNT(DISTINCT message_key) FILTER (WHERE "eventType" = 'tran') AS delivered,
+                COUNT(DISTINCT message_key) FILTER (WHERE "eventType" IN ('bounce','rb')) AS bounced,
+                COUNT(DISTINCT message_key) FILTER (WHERE "eventType" = 'fbl') AS complaints,
+                AVG("deliveryLatency") FILTER (WHERE "eventType" = 'tran') AS "avgLatencySeconds"
+            FROM filtered
+            GROUP BY "recipientDomain"
+            ORDER BY "messageAttempts" DESC
+            LIMIT 100;
+        `);
 
         const stats = domainStats.map(d => ({
-            domain: d.recipientDomain,
-            total: d._sum.totalCount,
-            delivered: d._sum.delivered,
-            bounced: d._sum.bounced,
-            complaints: d._sum.complaints,
-            avgLatency: d._avg.avgLatencyMs ? (d._avg.avgLatencyMs / 1000).toFixed(2) : 0
+            domain: d.domain,
+            messageAttempts: Number(d.messageAttempts || 0),
+            delivered: Number(d.delivered || 0),
+            bounced: Number(d.bounced || 0),
+            complaints: Number(d.complaints || 0),
+            avgLatency: d.avgLatencySeconds ? Number(d.avgLatencySeconds).toFixed(2) : 0
         }));
 
         res.json(stats);
@@ -203,23 +230,45 @@ router.get('/domains', validate(schemas.analyticsQuery), async (req, res) => {
 // Get sender performance and risk
 router.get('/senders', validate(schemas.analyticsQuery), async (req, res) => {
     try {
-        const { from, to } = req.query;
-        const where = {
-            timeBucket: {
-                gte: from ? new Date(from) : undefined,
-                lte: to ? new Date(to) : undefined,
-            },
-            sender: { not: null }
-        };
+        const fileCount = await prisma.file.count();
+        if (fileCount === 0) {
+            return res.json([]);
+        }
 
-        const senderStats = await prisma.aggregateMinute.groupBy({
-            by: ['sender'],
-            _sum: { totalCount: true, delivered: true, bounced: true, complaints: true },
-            _count: { jobId: true },
-            where,
-            orderBy: { _sum: { totalCount: 'desc' } },
-            take: 100
-        });
+        const { from, to } = req.query;
+        const fromDate = from ? new Date(from).toISOString() : '1970-01-01T00:00:00.000Z';
+        const toDate = to ? new Date(to).toISOString() : '3000-01-01T00:00:00.000Z';
+
+        const senderStats = await prisma.$queryRawUnsafe(`
+            WITH filtered AS (
+                SELECT
+                    "sender",
+                    COALESCE("messageId", CONCAT_WS(':', "jobId", "recipient")) AS message_key,
+                    "eventType",
+                    "jobId"
+                FROM "Event"
+                WHERE "eventTimestamp" >= '${fromDate}'
+                  AND "eventTimestamp" <= '${toDate}'
+                  AND "sender" IS NOT NULL
+            )
+            SELECT
+                "sender",
+                COUNT(DISTINCT message_key) AS "messageAttempts",
+                COUNT(DISTINCT message_key) FILTER (WHERE "eventType" = 'tran') AS delivered,
+                COUNT(DISTINCT message_key) FILTER (WHERE "eventType" IN ('bounce','rb')) AS bounced,
+                COUNT(DISTINCT message_key) FILTER (WHERE "eventType" = 'fbl') AS complaints,
+                COUNT(DISTINCT "jobId") AS "jobCount",
+                CASE WHEN COUNT(DISTINCT message_key) > 0
+                     THEN (COUNT(DISTINCT message_key) FILTER (WHERE "eventType" IN ('bounce','rb'))::decimal / COUNT(DISTINCT message_key)) * 100
+                     ELSE 0 END AS "bounceRate",
+                CASE WHEN COUNT(DISTINCT message_key) > 0
+                     THEN (COUNT(DISTINCT message_key) FILTER (WHERE "eventType" = 'fbl')::decimal / COUNT(DISTINCT message_key)) * 100
+                     ELSE 0 END AS "complaintRate"
+            FROM filtered
+            GROUP BY "sender"
+            ORDER BY "messageAttempts" DESC
+            LIMIT 100;
+        `);
 
         const riskScores = await prisma.riskScore.findMany({
             where: { entityType: 'user' }
@@ -234,11 +283,13 @@ router.get('/senders', validate(schemas.analyticsQuery), async (req, res) => {
             const risk = riskMap[s.sender] || { riskScore: 0, riskLevel: 'low' };
             return {
                 sender: s.sender,
-                total: s._sum.totalCount,
-                delivered: s._sum.delivered,
-                bounced: s._sum.bounced,
-                complaints: s._sum.complaints,
-                jobCount: s._count.jobId,
+                messageAttempts: Number(s.messageAttempts || 0),
+                delivered: Number(s.delivered || 0),
+                bounced: Number(s.bounced || 0),
+                complaints: Number(s.complaints || 0),
+                jobCount: Number(s.jobCount || 0),
+                bounceRate: s.bounceRate ? Number(s.bounceRate).toFixed(2) : '0.00',
+                complaintRate: s.complaintRate ? Number(s.complaintRate).toFixed(2) : '0.00',
                 riskScore: risk.riskScore,
                 riskLevel: risk.riskLevel
             };

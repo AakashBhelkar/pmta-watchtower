@@ -121,6 +121,7 @@ model AggregateMinute {
   sender            String?
   recipientDomain   String?
   vmta              String?
+  fileId            String?
   totalCount        Int       @default(0)
   delivered         Int       @default(0)
   bounced           Int       @default(0)
@@ -129,11 +130,12 @@ model AggregateMinute {
   avgLatencyMs      Float?
   p95LatencyMs      Float?
 
-  @@unique([timeBucket, eventType, jobId, sender, recipientDomain, vmta])
+  @@unique([timeBucket, eventType, jobId, sender, recipientDomain, vmta, fileId])
   @@index([timeBucket])
   @@index([recipientDomain, timeBucket])
   @@index([jobId, timeBucket])
   @@index([eventType])
+  @@index([fileId])
 }
 
 model RiskScore {

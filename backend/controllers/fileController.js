@@ -269,7 +269,25 @@ exports.deleteFile = async (req, res) => {
                 // so this is a best-effort. Multer usually keeps the random filename.
             }
 
+            // Explicitly remove events for this file (defensive; onDelete: Cascade should handle it)
+            await tx.event.deleteMany({ where: { fileId: id } });
+
+            // Remove this file's contribution from aggregates
+            await tx.aggregateMinute.deleteMany({ where: { fileId: id } });
+
             await tx.file.delete({ where: { id } });
+
+            // If this was the last file, clear derived data so no stale stats remain
+            const remainingFiles = await tx.file.count();
+            if (remainingFiles === 0) {
+                // Order matters because alerts reference incidents
+                await tx.alert.deleteMany();
+                await tx.incident.deleteMany();
+                await tx.aggregateMinute.deleteMany();
+                await tx.riskScore.deleteMany();
+                await tx.event.deleteMany(); // safety: should already be empty
+                console.log('All files removed; cleared aggregates, alerts, incidents, and risk scores.');
+            }
         });
 
         res.json({
