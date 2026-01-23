@@ -78,19 +78,25 @@ export function SendersView() {
 
     const getRiskChip = (risk) => {
         const config = {
-            low: { color: 'success', icon: 'mdi:shield-check' },
-            medium: { color: 'warning', icon: 'mdi:shield-alert' },
-            high: { color: 'error', icon: 'mdi:shield-alert' },
-            critical: { color: 'error', icon: 'mdi:shield-off' },
+            low: { bgcolor: 'rgba(34, 197, 94, 0.12)', color: 'success.dark', icon: 'mdi:shield-check' },
+            medium: { bgcolor: 'rgba(255, 107, 53, 0.12)', color: 'warning.dark', icon: 'mdi:shield-alert' },
+            high: { bgcolor: 'rgba(255, 86, 48, 0.12)', color: 'error.dark', icon: 'mdi:shield-alert' },
+            critical: { bgcolor: 'rgba(255, 86, 48, 0.16)', color: 'error.dark', icon: 'mdi:shield-off' },
         };
-        const { color, icon } = config[risk] || config.low;
+        const { bgcolor, color, icon } = config[risk] || config.low;
         return (
             <Chip
                 size="small"
                 label={risk.toUpperCase()}
-                color={color}
-                icon={<Iconify icon={icon} width={16} />}
-                sx={{ height: 24 }}
+                icon={<Iconify icon={icon} width={16} sx={{ color: `${color} !important` }} />}
+                sx={{
+                    height: 24,
+                    borderRadius: 1,
+                    fontWeight: 500,
+                    bgcolor,
+                    color,
+                    '& .MuiChip-icon': { color },
+                }}
             />
         );
     };

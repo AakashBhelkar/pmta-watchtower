@@ -175,7 +175,7 @@ export function DashboardLayout({ sx, children, data }) {
           '--layout-transition-easing': 'linear',
           '--layout-transition-duration': '120ms',
           '--layout-nav-mini-width': '88px',
-          '--layout-nav-vertical-width': '300px',
+          '--layout-nav-vertical-width': '260px',
           '--layout-nav-horizontal-height': '64px',
           '--layout-dashboard-content-pt': theme.spacing(1),
           '--layout-dashboard-content-pb': theme.spacing(8),
@@ -228,26 +228,29 @@ function useNavColorVars(theme, settings) {
       case 'apparent':
         return {
           layout: {
-            '--layout-nav-bg': palette.grey[900],
-            '--layout-nav-horizontal-bg': varAlpha(palette.grey['900Channel'], 0.96),
+            '--layout-nav-bg': '#1C252E',
+            '--layout-nav-horizontal-bg': 'rgba(28, 37, 46, 0.96)',
             '--layout-nav-border-color': 'transparent',
             '--layout-nav-text-primary-color': palette.common.white,
-            '--layout-nav-text-secondary-color': palette.grey[500],
-            '--layout-nav-text-disabled-color': palette.grey[600],
+            '--layout-nav-text-secondary-color': 'rgba(255, 255, 255, 0.7)',
+            '--layout-nav-text-disabled-color': 'rgba(255, 255, 255, 0.5)',
             [stylesMode.dark]: {
-              '--layout-nav-bg': palette.grey[800],
-              '--layout-nav-horizontal-bg': varAlpha(palette.grey['800Channel'], 0.8),
+              '--layout-nav-bg': '#141A21',
+              '--layout-nav-horizontal-bg': 'rgba(20, 26, 33, 0.8)',
             },
           },
           section: {
             // caption
-            '--nav-item-caption-color': palette.grey[600],
+            '--nav-item-caption-color': 'rgba(255, 255, 255, 0.5)',
             // subheader
-            '--nav-subheader-color': palette.grey[600],
+            '--nav-subheader-color': 'rgba(255, 255, 255, 0.5)',
             '--nav-subheader-hover-color': palette.common.white,
             // item
-            '--nav-item-color': palette.grey[500],
-            '--nav-item-root-active-color': palette.primary.light,
+            '--nav-item-color': 'rgba(255, 255, 255, 0.7)',
+            '--nav-item-hover-bg': 'rgba(255, 255, 255, 0.08)',
+            '--nav-item-root-active-color': '#00B894',
+            '--nav-item-root-active-bg': 'rgba(0, 184, 148, 0.16)',
+            '--nav-item-root-active-hover-bg': 'rgba(0, 184, 148, 0.24)',
             '--nav-item-root-open-color': palette.common.white,
             // bullet
             '--nav-bullet-light-color': bulletColor.dark,

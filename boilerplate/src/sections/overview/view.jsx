@@ -93,7 +93,7 @@ export function OverviewView() {
             )}
 
             <Grid container spacing={3} sx={{ mb: 3 }}>
-                <Grid xs={12} sm={6} md={4} lg={2}>
+                <Grid xs={12} sm={6} md={4} lg={3}>
                     <StatsCard
                         title="Message Attempts"
                         value={stats.messageAttempts}
@@ -102,7 +102,7 @@ export function OverviewView() {
                         tooltip="Unique message attempts (deduped by messageId or job+recipient)."
                     />
                 </Grid>
-                <Grid xs={12} sm={6} md={4} lg={2}>
+                <Grid xs={12} sm={6} md={4} lg={3}>
                     <StatsCard
                         title="Delivered"
                         value={stats.deliveredMessages}
@@ -112,7 +112,7 @@ export function OverviewView() {
                         tooltip="Delivered message attempts / total attempts."
                     />
                 </Grid>
-                <Grid xs={12} sm={6} md={4} lg={2}>
+                <Grid xs={12} sm={6} md={4} lg={3}>
                     <StatsCard
                         title="Deferred"
                         value={stats.deferredMessages}
@@ -122,7 +122,7 @@ export function OverviewView() {
                         tooltip="Deferred message attempts / total attempts."
                     />
                 </Grid>
-                <Grid xs={12} sm={6} md={4} lg={2}>
+                <Grid xs={12} sm={6} md={4} lg={3}>
                     <StatsCard
                         title="Bounced"
                         value={stats.bouncedMessages}
@@ -132,7 +132,7 @@ export function OverviewView() {
                         tooltip="Bounced message attempts / total attempts."
                     />
                 </Grid>
-                <Grid xs={12} sm={6} md={4} lg={2}>
+                <Grid xs={12} sm={6} md={4} lg={3}>
                     <StatsCard
                         title="Complaints"
                         value={stats.complaintMessages}
@@ -141,7 +141,7 @@ export function OverviewView() {
                         tooltip="Complaint (FBL) message attempts."
                     />
                 </Grid>
-                <Grid xs={12} sm={6} md={4} lg={2}>
+                <Grid xs={12} sm={6} md={4} lg={3}>
                     <StatsCard
                         title="Avg Latency"
                         value={stats.avgLatency}

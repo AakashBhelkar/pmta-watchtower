@@ -1,10 +1,10 @@
 {
   "primary": {
-    "lighter": "#C8FAD6",
-    "light": "#5BE49B",
-    "main": "#00A76F",
-    "dark": "#007867",
-    "darker": "#004B50",
+    "lighter": "#E0F7F0",
+    "light": "#5DDDB8",
+    "main": "#00B894",
+    "dark": "#009975",
+    "darker": "#006B52",
     "contrastText": "#FFFFFF"
   },
   "secondary": {
@@ -32,12 +32,12 @@
     "contrastText": "#ffffff"
   },
   "warning": {
-    "lighter": "#FFF5CC",
-    "light": "#FFD666",
-    "main": "#FFAB00",
-    "dark": "#B76E00",
-    "darker": "#7A4100",
-    "contrastText": "#1C252E"
+    "lighter": "#FFF0E6",
+    "light": "#FFB088",
+    "main": "#FF6B35",
+    "dark": "#CC4A1A",
+    "darker": "#7A2E10",
+    "contrastText": "#FFFFFF"
   },
   "error": {
     "lighter": "#FFE9D5",
@@ -48,9 +48,9 @@
     "contrastText": "#FFFFFF"
   },
   "grey": {
-    "50": "#FCFDFD",
-    "100": "#F9FAFB",
-    "200": "#F4F6F8",
+    "50": "#FAFBFC",
+    "100": "#F5F7FA",
+    "200": "#EBEEF2",
     "300": "#DFE3E8",
     "400": "#C4CDD5",
     "500": "#919EAB",

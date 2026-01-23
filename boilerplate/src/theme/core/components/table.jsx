@@ -53,16 +53,21 @@ const MuiTableCell = {
    * STYLE
    *************************************** */
   styleOverrides: {
-    root: { borderBottomStyle: 'dashed' },
+    root: {
+      borderBottomStyle: 'solid',
+      borderBottomColor: '#EBEEF2',
+    },
     head: ({ theme }) => ({
-      fontSize: 14,
+      fontSize: 13,
       color: theme.vars.palette.text.secondary,
       fontWeight: theme.typography.fontWeightSemiBold,
-      backgroundColor: theme.vars.palette.background.neutral,
+      backgroundColor: '#FAFBFC',
+      textTransform: 'none',
+      letterSpacing: '0.2px',
     }),
     stickyHeader: ({ theme }) => ({
-      backgroundColor: theme.vars.palette.background.paper,
-      backgroundImage: `linear-gradient(to bottom, ${theme.vars.palette.background.neutral} 0%, ${theme.vars.palette.background.neutral} 100%)`,
+      backgroundColor: '#FAFBFC',
+      backgroundImage: 'none',
     }),
     paddingCheckbox: ({ theme }) => ({ paddingLeft: theme.spacing(1) }),
   },

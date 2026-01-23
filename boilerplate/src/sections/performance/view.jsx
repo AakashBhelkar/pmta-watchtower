@@ -179,7 +179,18 @@ export function PerformanceView() {
                                                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                                                     {row.domain}
                                                 {formatLatency(row.avgLatency).seconds > 5 && (
-                                                        <Chip size="small" label="slow" color="warning" sx={{ height: 18 }} />
+                                                        <Chip
+                                                            size="small"
+                                                            label="slow"
+                                                            sx={{
+                                                                height: 20,
+                                                                borderRadius: 1,
+                                                                fontWeight: 500,
+                                                                fontSize: 11,
+                                                                bgcolor: 'rgba(255, 107, 53, 0.12)',
+                                                                color: 'warning.dark',
+                                                            }}
+                                                        />
                                                     )}
                                                 </Box>
                                             </TableCell>

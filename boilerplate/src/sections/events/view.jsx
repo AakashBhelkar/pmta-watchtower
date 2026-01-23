@@ -92,14 +92,27 @@ export function EventsView() {
 
     const getEventTypeChip = (type) => {
         const config = {
-            acct: { color: 'success', label: 'ACCT' },
-            tran: { color: 'info', label: 'TRAN' },
-            bounce: { color: 'error', label: 'BOUNCE' },
-            fbl: { color: 'warning', label: 'FBL' },
-            rb: { color: 'default', label: 'RB' },
+            acct: { bgcolor: 'rgba(34, 197, 94, 0.12)', color: 'success.dark', label: 'ACCT' },
+            tran: { bgcolor: 'rgba(0, 184, 217, 0.12)', color: 'info.dark', label: 'TRAN' },
+            bounce: { bgcolor: 'rgba(255, 86, 48, 0.12)', color: 'error.dark', label: 'BOUNCE' },
+            fbl: { bgcolor: 'rgba(255, 107, 53, 0.12)', color: 'warning.dark', label: 'FBL' },
+            rb: { bgcolor: 'rgba(145, 158, 171, 0.12)', color: 'text.secondary', label: 'RB' },
         };
-        const { color, label } = config[type] || config.acct;
-        return <Chip size="small" label={label} color={color} sx={{ height: 22, minWidth: 65 }} />;
+        const { bgcolor, color, label } = config[type] || config.acct;
+        return (
+            <Chip
+                size="small"
+                label={label}
+                sx={{
+                    height: 24,
+                    minWidth: 65,
+                    borderRadius: 1,
+                    fontWeight: 500,
+                    bgcolor,
+                    color,
+                }}
+            />
+        );
     };
 
     return (

@@ -64,10 +64,15 @@ export function DomainsView() {
     };
 
     const getDeliveryChip = (rate) => {
-        if (rate >= 97) return <Chip size="small" label="Excellent" color="success" sx={{ height: 22 }} />;
-        if (rate >= 95) return <Chip size="small" label="Good" color="info" sx={{ height: 22 }} />;
-        if (rate >= 90) return <Chip size="small" label="Fair" color="warning" sx={{ height: 22 }} />;
-        return <Chip size="small" label="Poor" color="error" sx={{ height: 22 }} />;
+        const chipStyles = {
+            height: 24,
+            borderRadius: 1,
+            fontWeight: 500,
+        };
+        if (rate >= 97) return <Chip size="small" label="Excellent" sx={{ ...chipStyles, bgcolor: 'rgba(34, 197, 94, 0.12)', color: 'success.dark' }} />;
+        if (rate >= 95) return <Chip size="small" label="Good" sx={{ ...chipStyles, bgcolor: 'rgba(0, 184, 217, 0.12)', color: 'info.dark' }} />;
+        if (rate >= 90) return <Chip size="small" label="Fair" sx={{ ...chipStyles, bgcolor: 'rgba(255, 107, 53, 0.12)', color: 'warning.dark' }} />;
+        return <Chip size="small" label="Poor" sx={{ ...chipStyles, bgcolor: 'rgba(255, 86, 48, 0.12)', color: 'error.dark' }} />;
     };
 
     const totalSent = domains.reduce((sum, d) => sum + (d.messageAttempts || 0), 0);
