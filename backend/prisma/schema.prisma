@@ -75,7 +75,7 @@ model Event {
   eventTimestamp    DateTime?
   fileId            String?
   file              File?     @relation(fields: [fileId], references: [id], onDelete: Cascade)
-  
+
   // Core fields
   jobId             String?
   sender            String?
@@ -88,19 +88,23 @@ model Event {
   envId             String?
   messageId         String?
   customHeader      String?
-  
+
   // Status fields
   smtpStatus        String?
   bounceCategory    String?
   dsnAction         String?
   dsnDiag           String?
-  
+
   // Derived fields
   deliveryLatency   Decimal?  @db.Decimal(10, 3)
-  
+
+  // Computed message key for deduplication (COALESCE(messageId, jobId:recipient))
+  // Note: This is managed via raw SQL migration as GENERATED ALWAYS AS column
+  messageKey        String?
+
   // Raw data
   rawData           Json?
-  
+
   createdAt         DateTime  @default(now())
 
   @@index([eventType])
@@ -111,6 +115,15 @@ model Event {
   @@index([vmta])
   @@index([fileId])
   @@index([messageId])
+  @@index([messageKey])
+
+  // Composite indexes for common query patterns
+  @@index([eventType, eventTimestamp])
+  @@index([sender, eventType])
+  @@index([recipientDomain, eventTimestamp])
+  @@index([eventTimestamp, recipientDomain])
+  @@index([fileId, eventTimestamp])
+  @@index([messageKey, eventType])
 }
 
 model AggregateMinute {
@@ -122,11 +135,25 @@ model AggregateMinute {
   recipientDomain   String?
   vmta              String?
   fileId            String?
+
+  // Event-based counts (legacy, kept for backwards compatibility)
   totalCount        Int       @default(0)
   delivered         Int       @default(0)
   bounced           Int       @default(0)
   deferred          Int       @default(0)
   complaints        Int       @default(0)
+
+  // Message-based counts (deduplicated by messageKey)
+  messageAttempts      Int    @default(0)
+  deliveredMessages    Int    @default(0)
+  bouncedMessages      Int    @default(0)
+  complaintMessages    Int    @default(0)
+
+  // Latency aggregation (sum/count pattern for correct math)
+  latencySumMs      Float?    @default(0)
+  latencyCount      Int       @default(0)
+
+  // Legacy latency fields (deprecated, kept for backwards compatibility)
   avgLatencyMs      Float?
   p95LatencyMs      Float?
 
@@ -136,6 +163,10 @@ model AggregateMinute {
   @@index([jobId, timeBucket])
   @@index([eventType])
   @@index([fileId])
+  // Additional compound indexes for analytics queries
+  @@index([sender, timeBucket])
+  @@index([recipientDomain, eventType, timeBucket])
+  @@index([eventType, timeBucket])
 }
 
 model RiskScore {
@@ -172,6 +203,8 @@ model Alert {
   @@index([entityType, entityValue])
   @@index([status])
   @@index([createdAt])
+  // Compound index for duplicate alert checking
+  @@index([alertType, entityValue, status, createdAt])
 }
 
 model Incident {

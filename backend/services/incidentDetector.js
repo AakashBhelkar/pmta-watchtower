@@ -1,5 +1,5 @@
-const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
+const prisma = require('../lib/prisma');
+const config = require('../config');
 
 /**
  * Runs incident detection rules against recent data
@@ -10,14 +10,17 @@ exports.detectIncidents = async (referenceDate = new Date()) => {
         console.log(`🔍 Running Incident Detection Rules (Reference: ${referenceDate.toISOString()})...`);
 
         const now = referenceDate;
-        const shortWindow = new Date(now.getTime() - 15 * 60 * 1000); // 15 mins
-        const longWindow = new Date(now.getTime() - 24 * 60 * 60 * 1000); // 24 hours
+        const shortWindow = new Date(now.getTime() - config.detection.shortWindowMs);
+        const longWindow = new Date(now.getTime() - config.detection.longWindowMs);
 
         // Rule 1: Domain Throttling
         await this.detectDomainThrottling(shortWindow, longWindow);
 
         // Rule 2: Complaint Spikes
-        await this.detectComplaintSpikes(new Date(now.getTime() - 30 * 60 * 1000), new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000));
+        await this.detectComplaintSpikes(
+            new Date(now.getTime() - config.detection.complaintWindowMs),
+            new Date(now.getTime() - config.detection.weeklyWindowMs)
+        );
 
         // Rule 3: High Bounce Rate
         await this.detectHighBounceRate(shortWindow);
@@ -30,95 +33,118 @@ exports.detectIncidents = async (referenceDate = new Date()) => {
 
 /**
  * Detects domain-level throttling based on latency deviation
+ * Uses sum/count pattern for correct latency calculation
  */
 exports.detectDomainThrottling = async (shortWindow, longWindow) => {
-    // Current Latency per domain (15m)
+    // Query 1: Get current latency per domain using sum/count for correct averaging
     const currentLatency = await prisma.aggregateMinute.groupBy({
         by: ['recipientDomain'],
-        _avg: { avgLatencyMs: true },
-        _sum: { totalCount: true, deferred: true },
+        _sum: { latencySumMs: true, latencyCount: true, deferred: true, deliveredMessages: true },
         where: { timeBucket: { gte: shortWindow }, eventType: 'tran' }
     });
 
+    // Extract domain list for batch baseline query
+    const domains = currentLatency
+        .filter(d => d.recipientDomain && d._sum.latencyCount > 0)
+        .map(d => d.recipientDomain);
+
+    if (domains.length === 0) return;
+
+    // Query 2: Get baselines for ALL domains in a single query
+    const baselines = await prisma.aggregateMinute.groupBy({
+        by: ['recipientDomain'],
+        _sum: { latencySumMs: true, latencyCount: true },
+        where: {
+            recipientDomain: { in: domains },
+            timeBucket: { gte: longWindow },
+            eventType: 'tran'
+        }
+    });
+
+    // Create lookup map with computed averages for O(1) access
+    const baselineMap = new Map(
+        baselines.map(b => {
+            const avgMs = b._sum.latencyCount > 0 ? b._sum.latencySumMs / b._sum.latencyCount : 0;
+            return [b.recipientDomain, avgMs];
+        })
+    );
+
+    // Process domains with O(1) lookups
     for (const domain of currentLatency) {
-        if (!domain._avg.avgLatencyMs) continue;
+        if (!domain._sum.latencyCount || domain._sum.latencyCount === 0) continue;
 
-        // Baseline (24h)
-        const baseline = await prisma.aggregateMinute.aggregate({
-            _avg: { avgLatencyMs: true },
-            where: {
-                recipientDomain: domain.recipientDomain,
-                timeBucket: { gte: longWindow },
-                eventType: 'tran'
-            }
-        });
+        const currentAvgMs = domain._sum.latencySumMs / domain._sum.latencyCount;
+        const baselineAvg = baselineMap.get(domain.recipientDomain) || config.thresholds.baselineLatencyMs;
 
-        const baselineAvg = baseline._avg.avgLatencyMs || 500; // fallback 500ms
-
-        if (domain._avg.avgLatencyMs > baselineAvg * 1.5 && (domain._sum.deferred > 0 || domain._avg.avgLatencyMs > 5000)) {
+        if (currentAvgMs > baselineAvg * config.thresholds.throttlingMultiplier &&
+            (domain._sum.deferred > 0 || currentAvgMs > config.thresholds.highLatencyMs)) {
             await this.createAlert({
                 alertType: 'THROTTLING',
                 severity: 'high',
                 entityType: 'domain',
                 entityValue: domain.recipientDomain,
-                summary: `ISP Throttling detected on ${domain.recipientDomain}: Latency is ${(domain._avg.avgLatencyMs / 1000).toFixed(1)}s`,
-                metrics: { currentLatency: domain._avg.avgLatencyMs, baselineLatency: baselineAvg, deferred: domain._sum.deferred }
+                summary: `ISP Throttling detected on ${domain.recipientDomain}: Latency is ${(currentAvgMs / 1000).toFixed(1)}s`,
+                metrics: { currentLatency: currentAvgMs, baselineLatency: baselineAvg, deferred: domain._sum.deferred }
             });
         }
     }
 };
 
 /**
- * Detects unusual spikes in complaints
+ * Detects unusual spikes in complaints using message-based metrics
  */
 exports.detectComplaintSpikes = async (shortWindow, longWindow) => {
+    // Use message-based counts for accurate rate calculation
     const currentComplaints = await prisma.aggregateMinute.groupBy({
         by: ['jobId'],
-        _sum: { complaints: true, totalCount: true },
+        _sum: { complaintMessages: true, messageAttempts: true },
         where: { timeBucket: { gte: shortWindow } }
     });
 
     for (const job of currentComplaints) {
-        if (!job._sum.complaints || job._sum.complaints < 1) continue;
+        if (!job._sum.complaintMessages || job._sum.complaintMessages < 1) continue;
+        if (!job._sum.messageAttempts || job._sum.messageAttempts === 0) continue;
 
-        const rate = job._sum.complaints / job._sum.totalCount;
+        const rate = job._sum.complaintMessages / job._sum.messageAttempts;
 
-        if (rate > 0.01) { // 1% complaint rate
+        if (rate > config.thresholds.complaintRate) {
             await this.createAlert({
                 alertType: 'COMPLAINT_SPIKE',
                 severity: 'critical',
                 entityType: 'job',
                 entityValue: job.jobId || 'unknown',
                 summary: `Complaint spike for Job ${job.jobId}: Rate is ${(rate * 100).toFixed(2)}%`,
-                metrics: { complaintRate: rate, totalComplaints: job._sum.complaints }
+                metrics: { complaintRate: rate, totalComplaints: job._sum.complaintMessages }
             });
         }
     }
 };
 
 /**
- * Detects high bounce rates
+ * Detects high bounce rates using message-based metrics
  */
 exports.detectHighBounceRate = async (shortWindow) => {
+    // Use message-based counts for accurate rate calculation
     const stats = await prisma.aggregateMinute.groupBy({
         by: ['jobId'],
-        _sum: { bounced: true, totalCount: true },
+        _sum: { bouncedMessages: true, messageAttempts: true },
         where: { timeBucket: { gte: shortWindow } }
     });
 
     for (const job of stats) {
-        if (!job._sum.bounced || job._sum.totalCount < 10) continue;
+        if (!job._sum.bouncedMessages || !job._sum.messageAttempts) continue;
+        if (job._sum.messageAttempts < config.thresholds.minMessagesForBounce) continue;
 
-        const rate = job._sum.bounced / job._sum.totalCount;
+        const rate = job._sum.bouncedMessages / job._sum.messageAttempts;
 
-        if (rate > 0.2) { // 20% bounce rate
+        if (rate > config.thresholds.bounceRate) {
             await this.createAlert({
                 alertType: 'HIGH_BOUNCE',
                 severity: 'high',
                 entityType: 'job',
                 entityValue: job.jobId || 'unknown',
                 summary: `High bounce rate for Job ${job.jobId}: ${(rate * 100).toFixed(1)}%`,
-                metrics: { bounceRate: rate, totalBounced: job._sum.bounced }
+                metrics: { bounceRate: rate, totalBounced: job._sum.bouncedMessages }
             });
         }
     }
@@ -133,7 +159,7 @@ exports.createAlert = async (data) => {
             alertType: data.alertType,
             entityValue: data.entityValue,
             status: 'open',
-            createdAt: { gte: new Date(Date.now() - 30 * 60 * 1000) } // Cooldown 30 mins
+            createdAt: { gte: new Date(Date.now() - config.detection.alertCooldownMs) }
         }
     });
 
@@ -166,7 +192,7 @@ exports.createAlert = async (data) => {
         data: {
             ...data,
             incidentId: incident.id,
-            timeWindowStart: new Date(Date.now() - 15 * 60 * 1000),
+            timeWindowStart: new Date(Date.now() - config.detection.shortWindowMs),
             timeWindowEnd: new Date()
         }
     });

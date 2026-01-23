@@ -269,7 +269,6 @@ function useNavColorVars(theme, settings) {
     palette.background.defaultChannel,
     palette.common.white,
     palette.grey,
-    palette.primary.light,
     palette.text.disabled,
     palette.text.primary,
     palette.text.secondary,

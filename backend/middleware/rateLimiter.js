@@ -1,11 +1,12 @@
 const rateLimit = require('express-rate-limit');
+const config = require('../config');
 
 // General API rate limiter
 const apiLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 100, // Limit each IP to 100 requests per windowMs
-    standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
-    legacyHeaders: false, // Disable the `X-RateLimit-*` headers
+    windowMs: config.rateLimit.api.windowMs,
+    max: config.rateLimit.api.maxRequests,
+    standardHeaders: true,
+    legacyHeaders: false,
     message: {
         error: 'Too Many Requests',
         message: 'You have exceeded the request limit. Please try again later.'
@@ -14,8 +15,8 @@ const apiLimiter = rateLimit({
 
 // Stricter limiter for sensitive endpoints (e.g. upload)
 const uploadLimiter = rateLimit({
-    windowMs: 60 * 60 * 1000, // 1 hour
-    max: 20, // Limit each IP to 20 uploads per hour
+    windowMs: config.rateLimit.upload.windowMs,
+    max: config.rateLimit.upload.maxRequests,
     message: {
         error: 'Too Many Uploads',
         message: 'Upload limit exceeded. Please try again later.'

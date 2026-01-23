@@ -3,13 +3,13 @@ const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
-const { PrismaClient } = require('@prisma/client');
 const path = require('path');
 const fs = require('fs');
+const prisma = require('./lib/prisma');
+const config = require('./config');
 
 const app = express();
-const prisma = new PrismaClient();
-const PORT = process.env.PORT || 4000;
+const PORT = config.server.port;
 
 // Ensure uploads directory exists
 const uploadsDir = path.join(__dirname, 'uploads');
@@ -22,7 +22,7 @@ app.use(helmet({
     crossOriginResourcePolicy: { policy: 'cross-origin' }
 }));
 app.use(cors({
-    origin: process.env.CORS_ORIGIN || '*',
+    origin: config.server.corsOrigin,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization']
 }));
@@ -31,9 +31,9 @@ app.use(cors({
 const { apiLimiter } = require('./middleware/rateLimiter');
 app.use('/api', apiLimiter);
 
-app.use(express.json({ limit: '50mb' }));
-app.use(express.urlencoded({ extended: true, limit: '50mb' }));
-app.use(morgan(process.env.NODE_ENV === 'development' ? 'dev' : 'combined'));
+app.use(express.json({ limit: config.upload.bodyLimit }));
+app.use(express.urlencoded({ extended: true, limit: config.upload.bodyLimit }));
+app.use(morgan(config.server.nodeEnv === 'development' ? 'dev' : 'combined'));
 
 // Root route
 app.get('/', (req, res) => {
@@ -87,38 +87,18 @@ app.get('/api', (req, res) => {
 // 404 handler
 app.use((req, res) => {
     res.status(404).json({
-        error: 'Not Found',
-        message: `Route ${req.method} ${req.path} not found`,
-        timestamp: new Date()
+        success: false,
+        error: {
+            code: 'NOT_FOUND',
+            message: `Route ${req.method} ${req.path} not found`
+        },
+        timestamp: new Date().toISOString()
     });
 });
 
-// Error handling middleware
-app.use((err, req, res, next) => {
-    console.error('Error:', err.stack);
-
-    // Handle specific error types
-    if (err.name === 'ValidationError') {
-        return res.status(400).json({
-            error: 'Validation Error',
-            message: err.message,
-            details: err.details
-        });
-    }
-
-    if (err.code === 'P2002') {
-        return res.status(409).json({
-            error: 'Conflict',
-            message: 'A record with this data already exists'
-        });
-    }
-
-    res.status(err.status || 500).json({
-        error: err.name || 'Internal Server Error',
-        message: process.env.NODE_ENV === 'development' ? err.message : 'An unexpected error occurred',
-        timestamp: new Date()
-    });
-});
+// Centralized error handling middleware
+const { errorHandler } = require('./middleware/errorHandler');
+app.use(errorHandler);
 
 // Graceful shutdown handling
 const gracefulShutdown = async (signal) => {
@@ -150,7 +130,7 @@ process.on('unhandledRejection', (reason, promise) => {
 // Start server
 const server = app.listen(PORT, () => {
     console.log(`🚀 PMTA Watchtower Backend running on http://localhost:${PORT}`);
-    console.log(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);
+    console.log(`📊 Environment: ${config.server.nodeEnv}`);
 });
 
 module.exports = { app, prisma, server };

@@ -2,7 +2,7 @@ import { memo } from 'react';
 import ApexChart from 'react-apexcharts';
 
 import Box from '@mui/material/Box';
-import { useTheme, styled } from '@mui/material/styles';
+import { styled, useTheme } from '@mui/material/styles';
 
 // ----------------------------------------------------------------------
 

@@ -1,7 +1,6 @@
 const fs = require('fs');
 const Papa = require('papaparse');
-const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
+const prisma = require('../lib/prisma');
 const { detectFileType, normalizeEvent } = require('../utils/csvParser');
 const analyticsService = require('./analyticsService');
 

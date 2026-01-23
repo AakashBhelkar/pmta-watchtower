@@ -7,6 +7,7 @@ import Alert from '@mui/material/Alert';
 import Stack from '@mui/material/Stack';
 import Button from '@mui/material/Button';
 import Table from '@mui/material/Table';
+import Tooltip from '@mui/material/Tooltip';
 import TableRow from '@mui/material/TableRow';
 import TableBody from '@mui/material/TableBody';
 import TableCell from '@mui/material/TableCell';
@@ -17,13 +18,15 @@ import Typography from '@mui/material/Typography';
 import TableContainer from '@mui/material/TableContainer';
 import LinearProgress from '@mui/material/LinearProgress';
 import TableSortLabel from '@mui/material/TableSortLabel';
+import TablePagination from '@mui/material/TablePagination';
 import CircularProgress from '@mui/material/CircularProgress';
-import Tooltip from '@mui/material/Tooltip';
 
 import { getDomainStats } from 'src/services';
-import { DateRangePicker } from 'src/components/date-range-picker';
-import { DashboardContent } from 'src/layouts/dashboard';
+
 import { Iconify } from 'src/components/iconify';
+import { DashboardContent } from 'src/layouts/dashboard';
+import { DateRangePicker } from 'src/components/date-range-picker';
+
 import { formatLatency } from 'src/utils/format-latency';
 
 import { StatsCard } from '../overview/stats-card';
@@ -34,6 +37,8 @@ export function DomainsView() {
     const [domains, setDomains] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+    const [page, setPage] = useState(0);
+    const [rowsPerPage, setRowsPerPage] = useState(10);
     const [dateRange, setDateRange] = useState({
         start: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000), // Last 7 days
         end: new Date(),
@@ -163,6 +168,7 @@ export function DomainsView() {
                         </Typography>
                     </Stack>
                 ) : (
+                    <>
                     <TableContainer>
                         <Table>
                             <TableHead>
@@ -180,7 +186,9 @@ export function DomainsView() {
                                 </TableRow>
                             </TableHead>
                             <TableBody>
-                                {domains.map((row) => {
+                                {domains
+                                    .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
+                                    .map((row) => {
                                     const deliveryRate = row.messageAttempts > 0 ? ((row.delivered / row.messageAttempts) * 100) : 0;
                                     return (
                                         <TableRow key={row.domain} hover>
@@ -227,6 +235,18 @@ export function DomainsView() {
                             </TableBody>
                         </Table>
                     </TableContainer>
+                    <TablePagination
+                        component="div"
+                        count={domains.length}
+                        page={page}
+                        onPageChange={(e, newPage) => setPage(newPage)}
+                        rowsPerPage={rowsPerPage}
+                        onRowsPerPageChange={(e) => {
+                            setRowsPerPage(parseInt(e.target.value, 10));
+                            setPage(0);
+                        }}
+                    />
+                    </>
                 )}
             </Card>
         </DashboardContent>

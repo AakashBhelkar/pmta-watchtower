@@ -1,11 +1,5 @@
-// PMTA Header mappings
-const FILE_TYPE_HEADERS = {
-    acct: ['type', 'timeLogged', 'timeQueued', 'orig', 'rcpt', 'dsnAction', 'dsnStatus', 'dsnDiag', 'bounceCat', 'vmta', 'jobId'],
-    tran: ['type', 'timeLogged', 'timeQueued', 'orig', 'rcpt', 'dsnStatus', 'dsnDiag', 'vmta', 'jobId'],
-    bounce: ['type', 'timeLogged', 'bounceCat', 'vmta', 'orig', 'rcpt', 'dsnStatus', 'dsnDiag', 'jobId'],
-    fbl: ['type', 'timeLogged', 'orig', 'rcpt', 'vmta', 'jobId'],
-    rb: ['type', 'timeLogged', 'vmta', 'domain', 'rbType', 'dsnStatus', 'dsnDiag'],
-};
+const { FILE_TYPE_HEADERS, ACCT_TYPE_MAPPINGS } = require('../constants/eventTypes');
+const config = require('../config');
 
 exports.detectFileType = (headers) => {
     if (!headers || !Array.isArray(headers)) return 'unknown';
@@ -21,7 +15,7 @@ exports.detectFileType = (headers) => {
 
         const ratio = matchCount / expectedHeaders.length;
 
-        if (ratio >= 0.6 && ratio > highestRatio) {
+        if (ratio >= config.csvParser.fileTypeMatchThreshold && ratio > highestRatio) {
             highestRatio = ratio;
             bestMatch = fileType;
         }
@@ -55,30 +49,31 @@ exports.normalizeEvent = (row, fileType, fileId) => {
     // Determine specific event type for 'acct' logs based on 'type' field
     let mappedType = fileType;
     if (fileType === 'acct' && row.type) {
-        switch (row.type.toLowerCase()) {
-            case 'd': mappedType = 'tran'; break; // Delivered
-            case 'b': mappedType = 'bounce'; break; // Bounce
-            case 't': mappedType = 'acct'; break; // Transient/Deferred (keep as acct)
-            case 'f': mappedType = 'fbl'; break; // Feedback Loop
-            case 'r': mappedType = 'rb'; break; // Remote Bounce
-            // Other types like 'p' (queued) can stay as 'acct' or be excluded
-        }
+        const typeCode = row.type.toLowerCase();
+        mappedType = ACCT_TYPE_MAPPINGS[typeCode] || 'acct';
     }
+
+    // Compute messageKey for deduplication: prefer messageId, fallback to jobId:recipient
+    const jobId = row.jobId || null;
+    const recipient = row.rcpt || null;
+    const messageId = row.messageId || null;
+    const messageKey = messageId || (jobId && recipient ? `${jobId}:${recipient}` : null);
 
     return {
         eventType: mappedType,
         eventTimestamp: parseTimestamp(row.timeLogged),
         fileId: fileId,
-        jobId: row.jobId || null,
+        jobId: jobId,
         sender: row.orig || null,
-        recipient: row.rcpt || null,
+        recipient: recipient,
         recipientDomain: row.domain || extractDomain(row.rcpt),
         vmta: row.vmta || null,
         vmtaPool: row.vmtaPool || row.vmtaPool2 || null,
         sourceIp: row.dlvSourceIp || null,
         destinationIp: row.dlvDestinationIp || null,
         envId: row.envId || null,
-        messageId: row.messageId || null,
+        messageId: messageId,
+        messageKey: messageKey,
 
         smtpStatus: row.dsnStatus || null,
         bounceCategory: row.bounceCat || null,

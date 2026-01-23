@@ -86,7 +86,7 @@ export const getRelatedEvents = async (params) => {
     const qs = query.toString();
 
     const response = await axiosInstance.get(`/events/related/${idPart}${qs ? `?${qs}` : ''}`);
-    const data = response.data;
+    const { data } = response;
 
     // Backward compatibility: older backend may return plain array
     if (Array.isArray(data)) return data;

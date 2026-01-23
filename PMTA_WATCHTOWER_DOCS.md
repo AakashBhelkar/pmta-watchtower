@@ -716,4 +716,287 @@ date range.
 
 ---
 
-*Document Version: 2.1 | Last Updated: 2026-01-21*
+---
+
+## 16. CSV Processing & Calculation Pipeline (Technical Deep Dive)
+
+This section provides a detailed technical breakdown of how PMTA Watchtower processes CSV files and calculates all metrics.
+
+### 16.1 CSV File Upload Flow
+
+```
+┌─────────────┐     ┌──────────────┐     ┌─────────────────┐     ┌────────────────┐
+│   Upload    │────▶│  Hash Check  │────▶│  Stream Parse   │────▶│   Normalize    │
+│   (ZIP/CSV) │     │  (MD5)       │     │  (PapaParse)    │     │   Events       │
+└─────────────┘     └──────────────┘     └─────────────────┘     └────────────────┘
+                           │                                              │
+                    ┌──────▼──────┐                              ┌────────▼────────┐
+                    │  Duplicate? │                              │  Bulk Insert    │
+                    │  Skip file  │                              │  to Event table │
+                    └─────────────┘                              └────────┬────────┘
+                                                                          │
+┌─────────────────────────────────────────────────────────────────────────▼─────────┐
+│                              POST-INGESTION PIPELINE                               │
+├────────────────────┬────────────────────┬─────────────────────────────────────────┤
+│  Aggregation       │  Risk Scoring      │  Incident Detection                     │
+│  (AggregateMinute) │  (RiskScore)       │  (Alert, Incident)                      │
+└────────────────────┴────────────────────┴─────────────────────────────────────────┘
+```
+
+### 16.2 File Type Detection Algorithm
+
+**Location:** `backend/utils/csvParser.js` → `detectFileType()`
+
+The system auto-detects PMTA file types by comparing CSV headers against known patterns:
+
+```javascript
+FILE_TYPE_HEADERS = {
+    acct:   ['type', 'timeLogged', 'timeQueued', 'orig', 'rcpt', 'dsnAction', 'dsnStatus', ...],
+    tran:   ['type', 'timeLogged', 'timeQueued', 'orig', 'rcpt', 'dsnStatus', 'dsnDiag', ...],
+    bounce: ['type', 'timeLogged', 'bounceCat', 'vmta', 'orig', 'rcpt', 'dsnStatus', ...],
+    fbl:    ['type', 'timeLogged', 'orig', 'rcpt', 'vmta', 'jobId'],
+    rb:     ['type', 'timeLogged', 'vmta', 'domain', 'rbType', 'dsnStatus', 'dsnDiag']
+}
+```
+
+**Detection Logic:**
+1. Normalize all headers to lowercase
+2. For each file type, count how many expected headers match
+3. Calculate match ratio: `matchCount / expectedHeaders.length`
+4. If ratio ≥ 60% (configurable), classify as that file type
+5. Return the file type with highest match ratio
+
+### 16.3 Event Normalization
+
+**Location:** `backend/utils/csvParser.js` → `normalizeEvent()`
+
+Each CSV row is normalized into a canonical `Event` record:
+
+| CSV Field | Event Field | Transformation |
+|-----------|-------------|----------------|
+| `timeLogged` | `eventTimestamp` | Parse as Date |
+| `orig` | `sender` | Direct mapping |
+| `rcpt` | `recipient` | Direct mapping |
+| `rcpt` | `recipientDomain` | Extract domain after `@` |
+| `vmta` | `vmta` | Direct mapping |
+| `jobId` | `jobId` | Direct mapping |
+| `dsnStatus` | `smtpStatus` | Direct mapping |
+| `dsnAction` | `dsnAction` | Direct mapping |
+| `dsnDiag` | `dsnDiag` | Direct mapping |
+| `bounceCat` | `bounceCategory` | Direct mapping |
+| `type` (acct only) | `eventType` | Mapped via ACCT_TYPE_MAPPINGS |
+
+**ACCT Type Code Mappings:**
+```javascript
+ACCT_TYPE_MAPPINGS = {
+    'd': 'tran',    // Delivered
+    'b': 'bounce',  // Bounce
+    't': 'acct',    // Transient/Deferred
+    'f': 'fbl',     // Feedback Loop (complaint)
+    'r': 'rb',      // Remote Bounce / Rate Block
+    'p': 'acct'     // Queued (keep as acct)
+}
+```
+
+**Latency Calculation:**
+```javascript
+deliveryLatency = (timeLogged - timeQueued) / 1000  // in seconds
+```
+
+### 16.4 Aggregation Pipeline
+
+**Location:** `backend/services/analyticsService.js` → `aggregateFileData()`
+
+After events are inserted, they are aggregated into `AggregateMinute` table for fast dashboard queries.
+
+**Aggregation Query (Simplified):**
+```sql
+INSERT INTO "AggregateMinute" (...)
+SELECT
+    DATE_TRUNC('minute', "eventTimestamp") as "timeBucket",
+    "eventType", "jobId", "sender", "recipientDomain", "vmta",
+    COUNT(*) as "totalCount",
+    SUM(CASE WHEN "eventType" = 'tran' THEN 1 ELSE 0 END) as "delivered",
+    SUM(CASE WHEN "eventType" IN ('bounce', 'rb') THEN 1 ELSE 0 END) as "bounced",
+    SUM(CASE WHEN "eventType" = 'acct' AND "dsnAction" = 'delayed' THEN 1 ELSE 0 END) as "deferred",
+    SUM(CASE WHEN "eventType" = 'fbl' THEN 1 ELSE 0 END) as "complaints",
+    AVG("deliveryLatency" * 1000) as "avgLatencyMs",
+    PERCENTILE_CONT(0.95) WITHIN GROUP (ORDER BY "deliveryLatency" * 1000) as "p95LatencyMs"
+FROM "Event"
+WHERE "fileId" = ?
+GROUP BY DATE_TRUNC('minute', "eventTimestamp"), "eventType", "jobId", "sender", "recipientDomain", "vmta"
+ON CONFLICT DO UPDATE SET
+    "totalCount" = existing + new,
+    "delivered" = existing + new,
+    ...
+```
+
+### 16.5 Risk Score Calculation
+
+**Location:** `backend/services/analyticsService.js` → `updateRiskScores()`
+
+For each sender in the uploaded file:
+
+```javascript
+// Calculate rates
+complaintRate = (complaintMessages / messageAttempts) * 100
+bounceRate = (bouncedMessages / messageAttempts) * 100
+
+// Calculate risk score (weighted formula)
+rawScore = complaintRate * 40 + bounceRate * 20
+riskScore = min(100, round(rawScore))
+
+// Determine risk level
+if (riskScore > 80) riskLevel = 'critical'
+else if (riskScore > 60) riskLevel = 'high'
+else if (riskScore > 30) riskLevel = 'medium'
+else riskLevel = 'low'
+```
+
+**Risk Weights (Configurable):**
+- Complaint weight: 40 (complaints severely impact reputation)
+- Bounce weight: 20 (bounces moderately impact reputation)
+
+### 16.6 Incident Detection Rules
+
+**Location:** `backend/services/incidentDetector.js`
+
+Three detection algorithms run after each file ingestion:
+
+#### Rule 1: Domain Throttling
+```javascript
+// Compare current 15-min avg latency vs 24-hour baseline
+if (currentLatency > baselineLatency * 1.5 && currentLatency > 5000ms) {
+    // OR there are deferred events
+    createAlert('THROTTLING', domain)
+}
+```
+
+#### Rule 2: Complaint Spikes
+```javascript
+// For each job in last 30 minutes
+if (complaintRate > 1%) {  // 0.01 threshold
+    createAlert('COMPLAINT_SPIKE', jobId)
+}
+```
+
+#### Rule 3: High Bounce Rate
+```javascript
+// For each job with ≥10 events in last 15 minutes
+if (bounceRate > 20%) {  // 0.20 threshold
+    createAlert('HIGH_BOUNCE', jobId)
+}
+```
+
+### 16.7 Analytics Queries
+
+#### Global Stats (`/api/analytics/stats`)
+Uses raw SQL on Event table with message-key deduplication:
+```sql
+WITH filtered AS (
+    SELECT COALESCE("messageId", CONCAT_WS(':', "jobId", "recipient")) AS message_key, ...
+)
+SELECT
+    COUNT(DISTINCT message_key) AS "messageAttempts",
+    COUNT(DISTINCT message_key) FILTER (WHERE "eventType" = 'tran') AS "deliveredMessages",
+    COUNT(DISTINCT message_key) FILTER (WHERE "eventType" IN ('bounce','rb')) AS "bouncedMessages",
+    AVG("deliveryLatency") FILTER (WHERE "eventType" = 'tran') AS "avgLatencySeconds",
+    PERCENTILE_CONT(0.95) WITHIN GROUP (ORDER BY "deliveryLatency") AS "p95LatencySeconds"
+```
+
+#### Volume Trend (`/api/analytics/volume`)
+Groups AggregateMinute by hour:
+```sql
+SELECT
+    DATE_TRUNC('hour', "timeBucket") as "time",
+    SUM("totalCount") as "sent",
+    SUM("delivered") as "delivered",
+    SUM("bounced") as "bounced",
+    SUM("deferred") as "deferred"
+FROM "AggregateMinute"
+GROUP BY 1 ORDER BY 1
+```
+
+#### Latency Trend (`/api/analytics/latency`)
+Filters to delivered messages only:
+```sql
+SELECT
+    DATE_TRUNC('hour', "timeBucket") as "time",
+    AVG("avgLatencyMs") / 1000 as "avgLatency",
+    MAX("p95LatencyMs") / 1000 as "p95Latency"
+FROM "AggregateMinute"
+WHERE "eventType" = 'tran'
+GROUP BY 1 ORDER BY 1
+```
+
+---
+
+## 17. Code Quality Report & Bug Fixes
+
+### 17.1 Bugs Fixed (2026-01-23)
+
+| Severity | File | Issue | Fix Applied |
+|----------|------|-------|-------------|
+| **CRITICAL** | `domainService.js` | SQL injection via `$queryRawUnsafe` | Changed to `$queryRaw` with parameterized queries |
+| **CRITICAL** | `senderService.js` | SQL injection via `$queryRawUnsafe` | Changed to `$queryRaw` with parameterized queries |
+| **MEDIUM** | `exportService.js` | Division by null for avgLatencyMs | Added null checks with fallback to '0.00' |
+| **MEDIUM** | `incidentDetector.js` | Division by zero in complaint rate | Added null/zero check for totalCount |
+| **MEDIUM** | `incidentDetector.js` | Division by zero in bounce rate | Added null check before division |
+
+### 17.2 Known Issues (Documented)
+
+| Severity | Location | Issue | Impact |
+|----------|----------|-------|--------|
+| **MEDIUM** | `analyticsService.js:61` | Latency averaging formula incorrect | Simple avg of averages instead of weighted avg |
+| **MEDIUM** | `analyticsService.js:62` | P95 uses GREATEST() on conflict | May overestimate P95 across multiple files |
+| **LOW** | `csvParser.js:45` | `isNaN()` check on Date | Should use `isNaN(date.getTime())` |
+| **LOW** | File deletion | Deleting file doesn't recompute aggregates | Stale data until all files removed |
+
+### 17.3 Security Notes
+
+- All analytics queries now use parameterized queries (`$queryRaw` with template literals)
+- File uploads use MD5 hashing for deduplication
+- CORS and Helmet middleware configured
+- Rate limiting implemented for API and upload endpoints
+
+---
+
+## 18. Configuration Reference
+
+All thresholds and settings are configurable via environment variables in `backend/config/index.js`:
+
+### Detection Windows
+| Setting | Env Variable | Default |
+|---------|--------------|---------|
+| Short window | `DETECTION_SHORT_WINDOW_MS` | 15 minutes |
+| Long window | `DETECTION_LONG_WINDOW_MS` | 24 hours |
+| Complaint window | `DETECTION_COMPLAINT_WINDOW_MS` | 30 minutes |
+
+### Alert Thresholds
+| Setting | Env Variable | Default |
+|---------|--------------|---------|
+| Throttling multiplier | `THROTTLING_MULTIPLIER` | 1.5x baseline |
+| High latency | `HIGH_LATENCY_MS` | 5000ms |
+| Complaint rate | `COMPLAINT_RATE_THRESHOLD` | 1% (0.01) |
+| Bounce rate | `BOUNCE_RATE_THRESHOLD` | 20% (0.20) |
+| Min events for bounce | `MIN_EVENTS_FOR_BOUNCE` | 10 |
+
+### Risk Scoring
+| Setting | Env Variable | Default |
+|---------|--------------|---------|
+| Complaint weight | `RISK_COMPLAINT_WEIGHT` | 40 |
+| Bounce weight | `RISK_BOUNCE_WEIGHT` | 20 |
+| Critical threshold | `RISK_CRITICAL_THRESHOLD` | 80 |
+| High threshold | `RISK_HIGH_THRESHOLD` | 60 |
+| Medium threshold | `RISK_MEDIUM_THRESHOLD` | 30 |
+
+### Cache TTLs
+| Setting | Env Variable | Default |
+|---------|--------------|---------|
+| Insights cache | `CACHE_INSIGHTS_TTL` | 60s |
+| File count cache | `CACHE_FILE_COUNT_TTL` | 30s |
+| Stats cache | `CACHE_STATS_TTL` | 30s |
+
+---
+
+*Document Version: 2.2 | Last Updated: 2026-01-23*

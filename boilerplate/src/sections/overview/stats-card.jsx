@@ -1,29 +1,35 @@
+import { memo, useMemo } from 'react';
+
 import Box from '@mui/material/Box';
 import Card from '@mui/material/Card';
 import Stack from '@mui/material/Stack';
-import Typography from '@mui/material/Typography';
 import Tooltip from '@mui/material/Tooltip';
+import Typography from '@mui/material/Typography';
 
 import { Iconify } from 'src/components/iconify';
 
 // ----------------------------------------------------------------------
 
-export function StatsCard({ title, value, color = 'primary', icon, percentage, tooltip }) {
-    const colorMap = {
-        primary: '#00B894',
-        success: '#22C55E',
-        warning: '#FF6B35',
-        error: '#FF5630',
-        info: '#00B8D9',
-    };
+// Static color maps - defined outside component to prevent recreation
+const COLOR_MAP = {
+    primary: '#00B894',
+    success: '#22C55E',
+    warning: '#FF6B35',
+    error: '#FF5630',
+    info: '#00B8D9',
+};
 
-    const bgColorMap = {
-        primary: 'rgba(0, 184, 148, 0.12)',
-        success: 'rgba(34, 197, 94, 0.12)',
-        warning: 'rgba(255, 107, 53, 0.12)',
-        error: 'rgba(255, 86, 48, 0.12)',
-        info: 'rgba(0, 184, 217, 0.12)',
-    };
+const BG_COLOR_MAP = {
+    primary: 'rgba(0, 184, 148, 0.12)',
+    success: 'rgba(34, 197, 94, 0.12)',
+    warning: 'rgba(255, 107, 53, 0.12)',
+    error: 'rgba(255, 86, 48, 0.12)',
+    info: 'rgba(0, 184, 217, 0.12)',
+};
+
+function StatsCardComponent({ title, value, color = 'primary', icon, percentage, tooltip }) {
+    const colorValue = COLOR_MAP[color];
+    const bgColorValue = BG_COLOR_MAP[color];
 
     // Format number - Pabbly style shows raw numbers without separators for large numbers
     const formatNumber = (num) => {
@@ -33,30 +39,31 @@ export function StatsCard({ title, value, color = 'primary', icon, percentage, t
         return safeNum.toLocaleString();
     };
 
+    // Memoize card styles to prevent recalculation
+    const cardSx = useMemo(() => ({
+        p: 3,
+        height: '100%',
+        borderRadius: 3,
+        boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
+        border: '1px solid #EBEEF2',
+        position: 'relative',
+        overflow: 'hidden',
+        bgcolor: 'background.paper',
+        // Subtle curved gradient accent (Pabbly style)
+        '&::before': {
+            content: '""',
+            position: 'absolute',
+            top: 0,
+            right: 0,
+            width: '50%',
+            height: '100%',
+            background: `radial-gradient(circle at top right, ${bgColorValue} 0%, transparent 70%)`,
+            pointerEvents: 'none',
+        },
+    }), [bgColorValue]);
+
     const content = (
-        <Card
-            sx={{
-                p: 3,
-                height: '100%',
-                borderRadius: 3,
-                boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
-                border: '1px solid #EBEEF2',
-                position: 'relative',
-                overflow: 'hidden',
-                bgcolor: 'background.paper',
-                // Subtle curved gradient accent (Pabbly style)
-                '&::before': {
-                    content: '""',
-                    position: 'absolute',
-                    top: 0,
-                    right: 0,
-                    width: '50%',
-                    height: '100%',
-                    background: `radial-gradient(circle at top right, ${bgColorMap[color]} 0%, transparent 70%)`,
-                    pointerEvents: 'none',
-                },
-            }}
-        >
+        <Card sx={cardSx}>
             <Stack direction="row" alignItems="center" justifyContent="space-between">
                 <Box sx={{ zIndex: 1 }}>
                     {/* Large bold number first (Pabbly layout) */}
@@ -90,11 +97,11 @@ export function StatsCard({ title, value, color = 'primary', icon, percentage, t
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        bgcolor: bgColorMap[color],
+                        bgcolor: bgColorValue,
                         zIndex: 1,
                     }}
                 >
-                    <Iconify icon={icon} width={28} sx={{ color: colorMap[color] }} />
+                    <Iconify icon={icon} width={28} sx={{ color: colorValue }} />
                 </Box>
             </Stack>
         </Card>
@@ -112,3 +119,6 @@ export function StatsCard({ title, value, color = 'primary', icon, percentage, t
         </Tooltip>
     );
 }
+
+// Memoize the component to prevent unnecessary re-renders
+export const StatsCard = memo(StatsCardComponent);
