@@ -21,11 +21,11 @@ import { Iconify } from 'src/components/iconify';
 // ----------------------------------------------------------------------
 
 const FILE_TYPES = {
-    acct: { label: 'Accounting', color: 'success', description: 'Final delivery outcome records' },
-    tran: { label: 'Transaction', color: 'info', description: 'SMTP transaction performance logs' },
-    bounce: { label: 'Bounce', color: 'error', description: 'Failure classification records' },
-    fbl: { label: 'FBL', color: 'warning', description: 'Complaint/feedback loop data' },
-    rb: { label: 'Rate Block', color: 'default', description: 'Reputation/rate blocking events' },
+    acct: { label: 'Accounting', bgcolor: 'rgba(34, 197, 94, 0.12)', color: 'success.dark', description: 'Final delivery outcome records' },
+    tran: { label: 'Transaction', bgcolor: 'rgba(0, 184, 217, 0.12)', color: 'info.dark', description: 'SMTP transaction performance logs' },
+    bounce: { label: 'Bounce', bgcolor: 'rgba(255, 86, 48, 0.12)', color: 'error.dark', description: 'Failure classification records' },
+    fbl: { label: 'FBL', bgcolor: 'rgba(255, 107, 53, 0.12)', color: 'warning.dark', description: 'Complaint/feedback loop data' },
+    rb: { label: 'Rate Block', bgcolor: 'rgba(145, 158, 171, 0.12)', color: 'text.secondary', description: 'Reputation/rate blocking events' },
 };
 
 export function UploadView() {
@@ -225,8 +225,13 @@ export function UploadView() {
                                                                 <Chip
                                                                     size="small"
                                                                     label={FILE_TYPES[fileItem.detectedType].label}
-                                                                    color={FILE_TYPES[fileItem.detectedType].color}
-                                                                    sx={{ height: 20 }}
+                                                                    sx={{
+                                                                        height: 24,
+                                                                        borderRadius: 1,
+                                                                        fontWeight: 500,
+                                                                        bgcolor: FILE_TYPES[fileItem.detectedType].bgcolor,
+                                                                        color: FILE_TYPES[fileItem.detectedType].color,
+                                                                    }}
                                                                 />
                                                             )}
                                                         </Stack>
@@ -284,7 +289,18 @@ export function UploadView() {
                                         }}
                                     >
                                         <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 0.5 }}>
-                                            <Chip size="small" label={key.toUpperCase()} color={value.color} />
+                                            <Chip
+                                                size="small"
+                                                label={key.toUpperCase()}
+                                                sx={{
+                                                    height: 24,
+                                                    borderRadius: 1,
+                                                    fontWeight: 600,
+                                                    fontSize: 11,
+                                                    bgcolor: value.bgcolor,
+                                                    color: value.color,
+                                                }}
+                                            />
                                             <Typography variant="subtitle2">{value.label}</Typography>
                                         </Stack>
                                         <Typography variant="body2" color="text.secondary">

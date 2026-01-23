@@ -27,19 +27,19 @@ import { Iconify } from 'src/components/iconify';
 // ----------------------------------------------------------------------
 
 const FILE_TYPE_CONFIG = {
-    acct: { color: 'success', label: 'ACCT' },
-    tran: { color: 'info', label: 'TRAN' },
-    bounce: { color: 'error', label: 'BOUNCE' },
-    fbl: { color: 'warning', label: 'FBL' },
-    rb: { color: 'default', label: 'RB' },
-    unknown: { color: 'default', label: 'UNKNOWN' },
+    acct: { bgcolor: 'rgba(34, 197, 94, 0.12)', color: 'success.dark', label: 'ACCT' },
+    tran: { bgcolor: 'rgba(0, 184, 217, 0.12)', color: 'info.dark', label: 'TRAN' },
+    bounce: { bgcolor: 'rgba(255, 86, 48, 0.12)', color: 'error.dark', label: 'BOUNCE' },
+    fbl: { bgcolor: 'rgba(255, 107, 53, 0.12)', color: 'warning.dark', label: 'FBL' },
+    rb: { bgcolor: 'rgba(145, 158, 171, 0.12)', color: 'text.secondary', label: 'RB' },
+    unknown: { bgcolor: 'rgba(145, 158, 171, 0.12)', color: 'text.secondary', label: 'UNKNOWN' },
 };
 
 const STATUS_CONFIG = {
-    completed: { color: 'success', label: 'Completed' },
-    processing: { color: 'info', label: 'Processing' },
-    pending: { color: 'warning', label: 'Pending' },
-    error: { color: 'error', label: 'Error' },
+    completed: { bgcolor: 'rgba(34, 197, 94, 0.12)', color: 'success.dark', label: 'Completed' },
+    processing: { bgcolor: 'rgba(0, 184, 217, 0.12)', color: 'info.dark', label: 'Processing' },
+    pending: { bgcolor: 'rgba(255, 107, 53, 0.12)', color: 'warning.dark', label: 'Pending' },
+    error: { bgcolor: 'rgba(255, 86, 48, 0.12)', color: 'error.dark', label: 'Error' },
 };
 
 export function FilesView() {
@@ -178,8 +178,13 @@ export function FilesView() {
                                                 <Chip
                                                     size="small"
                                                     label={FILE_TYPE_CONFIG[file.fileType]?.label || file.fileType}
-                                                    color={FILE_TYPE_CONFIG[file.fileType]?.color || 'default'}
-                                                    sx={{ height: 22 }}
+                                                    sx={{
+                                                        height: 24,
+                                                        borderRadius: 1,
+                                                        fontWeight: 500,
+                                                        bgcolor: FILE_TYPE_CONFIG[file.fileType]?.bgcolor || 'rgba(145, 158, 171, 0.12)',
+                                                        color: FILE_TYPE_CONFIG[file.fileType]?.color || 'text.secondary',
+                                                    }}
                                                 />
                                             </TableCell>
                                             <TableCell align="right">{formatFileSize(file.fileSize)}</TableCell>
@@ -195,8 +200,13 @@ export function FilesView() {
                                                 <Chip
                                                     size="small"
                                                     label={STATUS_CONFIG[file.processingStatus]?.label || file.processingStatus}
-                                                    color={STATUS_CONFIG[file.processingStatus]?.color || 'default'}
-                                                    sx={{ height: 22 }}
+                                                    sx={{
+                                                        height: 24,
+                                                        borderRadius: 1,
+                                                        fontWeight: 500,
+                                                        bgcolor: STATUS_CONFIG[file.processingStatus]?.bgcolor || 'rgba(145, 158, 171, 0.12)',
+                                                        color: STATUS_CONFIG[file.processingStatus]?.color || 'text.secondary',
+                                                    }}
                                                 />
                                             </TableCell>
                                             <TableCell align="center">

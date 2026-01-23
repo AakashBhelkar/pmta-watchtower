@@ -1,13 +1,11 @@
 import { useState, useEffect, useCallback } from 'react';
 
-import Box from '@mui/material/Box';
 import Card from '@mui/material/Card';
 import Chip from '@mui/material/Chip';
 import Alert from '@mui/material/Alert';
 import Stack from '@mui/material/Stack';
 import Button from '@mui/material/Button';
 import Table from '@mui/material/Table';
-import Avatar from '@mui/material/Avatar';
 import TableRow from '@mui/material/TableRow';
 import Grid from '@mui/material/Unstable_Grid2';
 import TableBody from '@mui/material/TableBody';
@@ -24,6 +22,8 @@ import { DashboardContent } from 'src/layouts/dashboard';
 
 import { Iconify } from 'src/components/iconify';
 import { DateRangePicker } from 'src/components/date-range-picker';
+
+import { StatsCard } from '../overview/stats-card';
 
 // ----------------------------------------------------------------------
 
@@ -150,44 +150,36 @@ export function SendersView() {
                     {/* Risk Summary */}
                     <Grid container spacing={3} sx={{ mb: 3 }}>
                         <Grid xs={12} sm={6} md={3}>
-                            <Card sx={{ p: 3, bgcolor: 'error.lighter' }}>
-                                <Stack direction="row" alignItems="center" spacing={2}>
-                                    <Avatar sx={{ bgcolor: 'error.main', width: 48, height: 48 }}>
-                                        <Iconify icon="mdi:shield-off" width={28} />
-                                    </Avatar>
-                                    <Box>
-                                        <Typography variant="subtitle2" color="text.secondary">Critical Risk</Typography>
-                                        <Typography variant="h4" color="error.dark">{criticalCount}</Typography>
-                                    </Box>
-                                </Stack>
-                            </Card>
+                            <StatsCard
+                                title="Critical Risk"
+                                value={criticalCount}
+                                color="error"
+                                icon="mdi:shield-off"
+                            />
                         </Grid>
                         <Grid xs={12} sm={6} md={3}>
-                            <Card sx={{ p: 3, bgcolor: 'warning.lighter' }}>
-                                <Stack direction="row" alignItems="center" spacing={2}>
-                                    <Avatar sx={{ bgcolor: 'warning.main', width: 48, height: 48 }}>
-                                        <Iconify icon="mdi:shield-alert" width={28} />
-                                    </Avatar>
-                                    <Box>
-                                        <Typography variant="subtitle2" color="text.secondary">High Risk</Typography>
-                                        <Typography variant="h4" color="warning.dark">{highRiskCount}</Typography>
-                                    </Box>
-                                </Stack>
-                            </Card>
+                            <StatsCard
+                                title="High Risk"
+                                value={highRiskCount}
+                                color="warning"
+                                icon="mdi:shield-alert"
+                            />
                         </Grid>
                         <Grid xs={12} sm={6} md={3}>
-                            <Card sx={{ p: 3 }}>
-                                <Typography variant="subtitle2" color="text.secondary">Total Senders</Typography>
-                                <Typography variant="h4">{senders.length}</Typography>
-                            </Card>
+                            <StatsCard
+                                title="Total Senders"
+                                value={senders.length}
+                                color="primary"
+                                icon="mdi:account-group"
+                            />
                         </Grid>
                         <Grid xs={12} sm={6} md={3}>
-                            <Card sx={{ p: 3 }}>
-                                <Typography variant="subtitle2" color="text.secondary">Avg Complaint Rate</Typography>
-                                <Typography variant="h4">
-                                    {avgComplaintRate}%
-                                </Typography>
-                            </Card>
+                            <StatsCard
+                                title="Avg Complaint Rate"
+                                value={`${avgComplaintRate}%`}
+                                color="info"
+                                icon="mdi:chart-line"
+                            />
                         </Grid>
                     </Grid>
 

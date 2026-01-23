@@ -26,6 +26,8 @@ import { DashboardContent } from 'src/layouts/dashboard';
 import { Iconify } from 'src/components/iconify';
 import { formatLatency } from 'src/utils/format-latency';
 
+import { StatsCard } from '../overview/stats-card';
+
 // ----------------------------------------------------------------------
 
 export function DomainsView() {
@@ -114,32 +116,36 @@ export function DomainsView() {
             {/* Summary Cards */}
             <Grid container spacing={3} sx={{ mb: 3 }}>
                 <Grid xs={12} sm={6} md={3}>
-                    <Card sx={{ p: 3 }}>
-                        <Typography variant="subtitle2" color="text.secondary">Total Sent</Typography>
-                        <Typography variant="h4">{totalSent.toLocaleString()}</Typography>
-                    </Card>
+                    <StatsCard
+                        title="Total Sent"
+                        value={totalSent}
+                        color="primary"
+                        icon="mdi:email-multiple"
+                    />
                 </Grid>
                 <Grid xs={12} sm={6} md={3}>
-                    <Card sx={{ p: 3 }}>
-                        <Typography variant="subtitle2" color="text.secondary">Overall Delivery Rate</Typography>
-                        <Typography variant="h4" color="success.main">
-                            {totalSent > 0 ? ((totalDelivered / totalSent) * 100).toFixed(1) : 0}%
-                        </Typography>
-                    </Card>
+                    <StatsCard
+                        title="Overall Delivery Rate"
+                        value={`${totalSent > 0 ? ((totalDelivered / totalSent) * 100).toFixed(1) : 0}%`}
+                        color="success"
+                        icon="mdi:email-check"
+                    />
                 </Grid>
                 <Grid xs={12} sm={6} md={3}>
-                    <Card sx={{ p: 3 }}>
-                        <Typography variant="subtitle2" color="text.secondary">Total Bounced</Typography>
-                        <Typography variant="h4" color="error.main">{totalBounced.toLocaleString()}</Typography>
-                    </Card>
+                    <StatsCard
+                        title="Total Bounced"
+                        value={totalBounced}
+                        color="error"
+                        icon="mdi:email-remove"
+                    />
                 </Grid>
                 <Grid xs={12} sm={6} md={3}>
-                    <Card sx={{ p: 3 }}>
-                        <Typography variant="subtitle2" color="text.secondary">Complaint Rate</Typography>
-                        <Typography variant="h4" color="warning.main">
-                            {totalSent > 0 ? ((totalComplaints / totalSent) * 100).toFixed(3) : 0}%
-                        </Typography>
-                    </Card>
+                    <StatsCard
+                        title="Complaint Rate"
+                        value={`${totalSent > 0 ? ((totalComplaints / totalSent) * 100).toFixed(3) : 0}%`}
+                        color="warning"
+                        icon="mdi:alert-circle"
+                    />
                 </Grid>
             </Grid>
 
